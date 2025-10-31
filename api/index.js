@@ -40,8 +40,8 @@ if (process.env.NODE_ENV === 'development') {
   app.use(morgan('combined'));
 }
 
-// Rate limiting
-app.use('/api', generalLimiter);
+// Rate limiting - Temporarily disabled for Vercel debugging
+// app.use('/api', generalLimiter);
 
 // Root endpoint
 app.get('/', (req, res) => {
