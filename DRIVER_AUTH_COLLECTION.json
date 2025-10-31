@@ -1,0 +1,256 @@
+{
+  "info": {
+    "name": "RESQ - Driver Authentication APIs",
+    "description": "Complete collection of driver authentication endpoints for RESQ Backend API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000/api/v1/auth",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refresh_token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Driver Signup (Send OTP)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phoneNumber\": \"+919961052060\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/driver/signup",
+          "host": ["{{base_url}}"],
+          "path": ["driver", "signup"]
+        },
+        "description": "Send OTP to driver's phone number for registration. Driver must not already exist."
+      },
+      "response": []
+    },
+    {
+      "name": "2. Driver Verify OTP & Create Account",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phoneNumber\": \"+919961052060\",\n  \"otp\": \"123456\",\n  \"firstName\": \"Ahmed\",\n  \"lastName\": \"Khan\",\n  \"email\": \"ahmed.khan@example.com\",\n  \"password\": \"SecurePass123!\",\n  \"vehicleType\": \"sedan\",\n  \"vehicleMake\": \"Toyota\",\n  \"vehicleModel\": \"Camry\",\n  \"vehicleYear\": 2020,\n  \"vehicleColor\": \"Silver\",\n  \"licensePlate\": \"QAT-12345\",\n  \"location\": {\n    \"type\": \"Point\",\n    \"coordinates\": [51.5310, 25.2854]\n  },\n  \"address\": \"Doha, Qatar\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/driver/verify-otp",
+          "host": ["{{base_url}}"],
+          "path": ["driver", "verify-otp"]
+        },
+        "description": "Verify OTP and create driver account. Driver will be created with 'pending' approval status. Returns access and refresh tokens.",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "exec": [
+                "if (pm.response.code === 201) {",
+                "    const response = pm.response.json();",
+                "    pm.collectionVariables.set('access_token', response.data.accessToken);",
+                "    pm.collectionVariables.set('refresh_token', response.data.refreshToken);",
+                "}"
+              ],
+              "type": "text/javascript"
+            }
+          }
+        ]
+      },
+      "response": []
+    },
+    {
+      "name": "3. Driver Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phoneNumber\": \"+919961052060\",\n  \"password\": \"SecurePass123!\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/driver/login",
+          "host": ["{{base_url}}"],
+          "path": ["driver", "login"]
+        },
+        "description": "Login with phone number and password. Returns access token, refresh token, and approval status.",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "exec": [
+                "if (pm.response.code === 200) {",
+                "    const response = pm.response.json();",
+                "    pm.collectionVariables.set('access_token', response.data.accessToken);",
+                "    pm.collectionVariables.set('refresh_token', response.data.refreshToken);",
+                "}"
+              ],
+              "type": "text/javascript"
+            }
+          }
+        ]
+      },
+      "response": []
+    },
+    {
+      "name": "4. Driver Submit Documents",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "drivingLicense",
+              "type": "file",
+              "src": "/path/to/driving-license.jpg",
+              "description": "Driver's driving license document (required)"
+            },
+            {
+              "key": "vehicleRegistration",
+              "type": "file",
+              "src": "/path/to/vehicle-registration.jpg",
+              "description": "Vehicle registration document (required)"
+            },
+            {
+              "key": "insurance",
+              "type": "file",
+              "src": "/path/to/insurance.jpg",
+              "description": "Vehicle insurance document (required)"
+            },
+            {
+              "key": "nationalId",
+              "type": "file",
+              "src": "/path/to/national-id.jpg",
+              "description": "Driver's national ID document (required)"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{base_url}}/driver/submit-documents",
+          "host": ["{{base_url}}"],
+          "path": ["driver", "submit-documents"]
+        },
+        "description": "Upload driver documents to Cloudinary. All 4 documents are required: drivingLicense, vehicleRegistration, insurance, nationalId. Driver must be logged in (requires access token)."
+      },
+      "response": []
+    },
+    {
+      "name": "5. Driver Forgot Password (Send OTP)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phoneNumber\": \"+919961052060\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/driver/forgot-password",
+          "host": ["{{base_url}}"],
+          "path": ["driver", "forgot-password"]
+        },
+        "description": "Send OTP to driver's phone number for password reset. Driver must exist in the system."
+      },
+      "response": []
+    },
+    {
+      "name": "6. Driver Reset Password",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phoneNumber\": \"+919961052060\",\n  \"otp\": \"123456\",\n  \"newPassword\": \"NewSecurePass123!\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/driver/reset-password",
+          "host": ["{{base_url}}"],
+          "path": ["driver", "reset-password"]
+        },
+        "description": "Reset password using OTP. Verify OTP and update password for the driver."
+      },
+      "response": []
+    },
+    {
+      "name": "7. Driver Refresh Token",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"refreshToken\": \"{{refresh_token}}\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/driver/refresh-token",
+          "host": ["{{base_url}}"],
+          "path": ["driver", "refresh-token"]
+        },
+        "description": "Get new access token using refresh token. Access tokens expire in 15 minutes, refresh tokens expire in 7 days.",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "exec": [
+                "if (pm.response.code === 200) {",
+                "    const response = pm.response.json();",
+                "    pm.collectionVariables.set('access_token', response.data.accessToken);",
+                "}"
+              ],
+              "type": "text/javascript"
+            }
+          }
+        ]
+      },
+      "response": []
+    }
+  ]
+}

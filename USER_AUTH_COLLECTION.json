@@ -1,0 +1,239 @@
+{
+	"info": {
+		"name": "RESQ - User Authentication",
+		"description": "Complete user authentication API collection for RESQ backend",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. User Signup (Send OTP)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"phoneNumber\": \"+919961052060\"\n}"
+				},
+				"url": {
+					"raw": "http://localhost:5000/api/v1/auth/user/signup",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5000",
+					"path": [
+						"api",
+						"v1",
+						"auth",
+						"user",
+						"signup"
+					]
+				},
+				"description": "Send OTP to phone number for user registration. OTP expires in 5 minutes."
+			},
+			"response": []
+		},
+		{
+			"name": "2. Verify OTP & Create Account",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"phoneNumber\": \"+919961052060\",\n  \"otp\": \"123456\",\n  \"username\": \"johndoe\",\n  \"password\": \"Pass@1234\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"email\": \"john@example.com\"\n}"
+				},
+				"url": {
+					"raw": "http://localhost:5000/api/v1/auth/user/verify-otp",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5000",
+					"path": [
+						"api",
+						"v1",
+						"auth",
+						"user",
+						"verify-otp"
+					]
+				},
+				"description": "Verify OTP and create user account. Returns access token and refresh token."
+			},
+			"response": []
+		},
+		{
+			"name": "3. User Login",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"username\": \"johndoe\",\n  \"password\": \"Pass@1234\"\n}"
+				},
+				"url": {
+					"raw": "http://localhost:5000/api/v1/auth/user/login",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5000",
+					"path": [
+						"api",
+						"v1",
+						"auth",
+						"user",
+						"login"
+					]
+				},
+				"description": "Login with username and password. Returns access token and refresh token."
+			},
+			"response": []
+		},
+		{
+			"name": "4. Forgot Password (Send OTP)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"phoneNumber\": \"+919961052060\"\n}"
+				},
+				"url": {
+					"raw": "http://localhost:5000/api/v1/auth/user/forgot-password",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5000",
+					"path": [
+						"api",
+						"v1",
+						"auth",
+						"user",
+						"forgot-password"
+					]
+				},
+				"description": "Send OTP to phone number for password reset. OTP expires in 5 minutes."
+			},
+			"response": []
+		},
+		{
+			"name": "5. Reset Password",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"phoneNumber\": \"+919961052060\",\n  \"otp\": \"123456\",\n  \"newPassword\": \"NewPass@1234\"\n}"
+				},
+				"url": {
+					"raw": "http://localhost:5000/api/v1/auth/user/reset-password",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5000",
+					"path": [
+						"api",
+						"v1",
+						"auth",
+						"user",
+						"reset-password"
+					]
+				},
+				"description": "Reset password using OTP verification."
+			},
+			"response": []
+		},
+		{
+			"name": "6. Refresh Access Token",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"refreshToken\": \"your_refresh_token_here\"\n}"
+				},
+				"url": {
+					"raw": "http://localhost:5000/api/v1/auth/user/refresh-token",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5000",
+					"path": [
+						"api",
+						"v1",
+						"auth",
+						"user",
+						"refresh-token"
+					]
+				},
+				"description": "Get a new access token using refresh token."
+			},
+			"response": []
+		},
+		{
+			"name": "7. Logout",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Authorization",
+						"value": "Bearer your_access_token_here"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:5000/api/v1/auth/logout",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5000",
+					"path": [
+						"api",
+						"v1",
+						"auth",
+						"logout"
+					]
+				},
+				"description": "Logout user and invalidate refresh token. Requires authentication."
+			},
+			"response": []
+		}
+	]
+}
