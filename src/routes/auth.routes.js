@@ -7,6 +7,7 @@ const { upload } = require('../middlewares/upload');
 // User Authentication Routes
 router.post('/user/signup', authController.userSignup);
 router.post('/user/verify-otp', authController.userVerifyOTP);
+router.post('/user/complete-signup', authController.userCompleteSignup);
 router.post('/user/login', authController.userLogin);
 router.post('/user/forgot-password', authController.userForgotPassword);
 router.post('/user/reset-password', authController.userResetPassword);
@@ -15,6 +16,7 @@ router.post('/user/refresh-token', authController.userRefreshToken);
 // Driver Authentication Routes
 router.post('/driver/signup', authController.driverSignup);
 router.post('/driver/verify-otp', authController.driverVerifyOTP);
+router.post('/driver/complete-signup', authController.driverCompleteSignup);
 router.post('/driver/login', authController.driverLogin);
 router.post('/driver/forgot-password', authController.driverForgotPassword);
 router.post('/driver/reset-password', authController.driverResetPassword);

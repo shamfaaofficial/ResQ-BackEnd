@@ -41,19 +41,44 @@ exports.userSignup = asyncHandler(async (req, res) => {
   });
 });
 
-// Verify OTP and create user account
+// Verify OTP only
 exports.userVerifyOTP = asyncHandler(async (req, res) => {
-  const { phoneNumber, otp, username, password, firstName, lastName, email } = req.body;
+  const { phoneNumber, otp } = req.body;
 
   // Validate required fields
-  if (!phoneNumber || !otp || !username || !password || !firstName) {
-    throw new ValidationError('All required fields must be provided');
+  if (!phoneNumber || !otp) {
+    throw new ValidationError('Phone number and OTP are required');
   }
 
   // Verify OTP
   const isValid = await otpService.verifyOTP(phoneNumber, otp, OTP_PURPOSE.SIGNUP);
   if (!isValid) {
     throw new ValidationError('Invalid or expired OTP');
+  }
+
+  res.status(200).json({
+    success: true,
+    message: 'OTP verified successfully',
+    data: {
+      phoneNumber,
+      verified: true
+    }
+  });
+});
+
+// Complete user signup after OTP verification
+exports.userCompleteSignup = asyncHandler(async (req, res) => {
+  const { phoneNumber, username, password, firstName, lastName, email } = req.body;
+
+  // Validate required fields
+  if (!phoneNumber || !username || !password || !firstName) {
+    throw new ValidationError('All required fields must be provided');
+  }
+
+  // Check if user already exists
+  const existingUser = await User.findOne({ phoneNumber });
+  if (existingUser) {
+    throw new ValidationError('User with this phone number already exists');
   }
 
   // Check if username already exists
@@ -289,19 +314,44 @@ exports.driverSignup = asyncHandler(async (req, res) => {
   });
 });
 
-// Verify OTP and create driver account
+// Verify OTP only
 exports.driverVerifyOTP = asyncHandler(async (req, res) => {
-  const { phoneNumber, otp, username, password, firstName, lastName, email } = req.body;
+  const { phoneNumber, otp } = req.body;
 
   // Validate required fields
-  if (!phoneNumber || !otp || !username || !password || !firstName) {
-    throw new ValidationError('All required fields must be provided');
+  if (!phoneNumber || !otp) {
+    throw new ValidationError('Phone number and OTP are required');
   }
 
   // Verify OTP
   const isValid = await otpService.verifyOTP(phoneNumber, otp, OTP_PURPOSE.SIGNUP);
   if (!isValid) {
     throw new ValidationError('Invalid or expired OTP');
+  }
+
+  res.status(200).json({
+    success: true,
+    message: 'OTP verified successfully',
+    data: {
+      phoneNumber,
+      verified: true
+    }
+  });
+});
+
+// Complete driver signup after OTP verification
+exports.driverCompleteSignup = asyncHandler(async (req, res) => {
+  const { phoneNumber, username, password, firstName, lastName, email } = req.body;
+
+  // Validate required fields
+  if (!phoneNumber || !username || !password || !firstName) {
+    throw new ValidationError('All required fields must be provided');
+  }
+
+  // Check if driver already exists
+  const existingDriver = await Driver.findOne({ phoneNumber });
+  if (existingDriver) {
+    throw new ValidationError('Driver with this phone number already exists');
   }
 
   // Check if username already exists
