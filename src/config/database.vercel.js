@@ -3,6 +3,11 @@ const mongoose = require('mongoose');
 let cachedConnection = null;
 
 const connectDatabase = async () => {
+  // Check if MONGODB_URI is set
+  if (!process.env.MONGODB_URI) {
+    throw new Error('MONGODB_URI environment variable is not set. Please configure it in Vercel dashboard.');
+  }
+
   // If we have a cached connection and it's connected, return it
   if (cachedConnection && mongoose.connection.readyState === 1) {
     console.log('Using cached database connection');
@@ -10,6 +15,8 @@ const connectDatabase = async () => {
   }
 
   try {
+    console.log('Attempting to connect to MongoDB...');
+
     // Remove deprecated options
     const conn = await mongoose.connect(process.env.MONGODB_URI, {
       serverSelectionTimeoutMS: 5000,

@@ -40,6 +40,23 @@ if (process.env.NODE_ENV === 'development') {
 // Rate limiting
 app.use('/api', generalLimiter);
 
+// Root endpoint
+app.get('/', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'RESQ Backend API',
+    version: '1.0.0',
+    endpoints: {
+      health: '/health',
+      auth: '/api/v1/auth',
+      user: '/api/v1/user',
+      driver: '/api/v1/driver',
+      admin: '/api/v1/admin',
+      utils: '/api/v1/utils'
+    }
+  });
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({
