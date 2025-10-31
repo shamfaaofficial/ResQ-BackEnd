@@ -3,7 +3,7 @@ const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
 const morgan = require('morgan');
-const connectDatabase = require('../src/config/database');
+const connectDatabase = require('../src/config/database.vercel');
 const errorHandler = require('../src/middlewares/errorHandler');
 const { generalLimiter } = require('../src/middlewares/rateLimiter');
 
@@ -74,41 +74,26 @@ app.use((req, res) => {
   });
 });
 
-// Connect to database (serverless functions reuse connections)
-let isConnected = false;
-
-const connectToDatabase = async () => {
-  if (isConnected) {
-    console.log('Using existing database connection');
-    return;
-  }
-
-  try {
-    await connectDatabase();
-    isConnected = true;
-    console.log('New database connection established');
-  } catch (error) {
-    console.error('Database connection error:', error);
-    throw error;
-  }
-};
-
 // Serverless function handler
 module.exports = async (req, res) => {
   try {
     // Connect to database before handling request
-    await connectToDatabase();
+    await connectDatabase();
 
     // Handle the request with Express app
-    return app(req, res);
+    app(req, res);
   } catch (error) {
     console.error('Serverless function error:', error);
-    return res.status(500).json({
-      success: false,
-      error: {
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'An error occurred processing your request'
-      }
-    });
+    console.error('Error stack:', error.stack);
+
+    if (!res.headersSent) {
+      return res.status(500).json({
+        success: false,
+        error: {
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error.message || 'An error occurred processing your request'
+        }
+      });
+    }
   }
 };
