@@ -13,10 +13,11 @@ const generalLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  // Skip rate limiting if trust proxy is not set (will be handled by error)
-  skip: (req) => false,
-  // Use X-Forwarded-For header for client IP in serverless environments
-  validate: { xForwardedForHeader: false }
+  // Trust X-Forwarded-For header (Vercel proxy)
+  validate: {
+    xForwardedForHeader: false,
+    trustProxy: true
+  }
 });
 
 // Strict limiter for auth endpoints
@@ -31,7 +32,10 @@ const authLimiter = rateLimit({
     }
   },
   skipSuccessfulRequests: true,
-  validate: { xForwardedForHeader: false }
+  validate: {
+    xForwardedForHeader: false,
+    trustProxy: true
+  }
 });
 
 // OTP request limiter
@@ -47,7 +51,10 @@ const otpLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  validate: { xForwardedForHeader: false }
+  validate: {
+    xForwardedForHeader: false,
+    trustProxy: true
+  }
 });
 
 // Payment limiter
@@ -61,7 +68,10 @@ const paymentLimiter = rateLimit({
       message: 'Too many payment attempts, please try again later'
     }
   },
-  validate: { xForwardedForHeader: false }
+  validate: {
+    xForwardedForHeader: false,
+    trustProxy: true
+  }
 });
 
 module.exports = {
