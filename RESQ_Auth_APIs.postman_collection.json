@@ -1,0 +1,432 @@
+{
+  "info": {
+    "name": "RESQ Auth APIs - Vercel",
+    "description": "Authentication APIs for RESQ Tow Car Service Platform (User & Driver)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "resq-backend"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://res-q-back-faj53q35n-shamfaaofficials-projects.vercel.app",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "User Auth",
+      "item": [
+        {
+          "name": "User Signup",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"+974XXXXXXXX\",\n  \"username\": \"john_doe\",\n  \"password\": \"Password@123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/user/signup",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "user", "signup"]
+            },
+            "description": "Register a new user account. Sends OTP to phone number."
+          },
+          "response": []
+        },
+        {
+          "name": "User Verify OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"+974XXXXXXXX\",\n  \"otp\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/user/verify-otp",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "user", "verify-otp"]
+            },
+            "description": "Verify OTP sent to phone number during signup."
+          },
+          "response": []
+        },
+        {
+          "name": "User Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.data && jsonData.data.accessToken) {",
+                  "        pm.collectionVariables.set('accessToken', jsonData.data.accessToken);",
+                  "    }",
+                  "    if (jsonData.data && jsonData.data.refreshToken) {",
+                  "        pm.collectionVariables.set('refreshToken', jsonData.data.refreshToken);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"+974XXXXXXXX\",\n  \"password\": \"Password@123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/user/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "user", "login"]
+            },
+            "description": "Login user with phone number and password. Returns access and refresh tokens."
+          },
+          "response": []
+        },
+        {
+          "name": "User Forgot Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"+974XXXXXXXX\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/user/forgot-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "user", "forgot-password"]
+            },
+            "description": "Request password reset OTP for user account."
+          },
+          "response": []
+        },
+        {
+          "name": "User Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"+974XXXXXXXX\",\n  \"otp\": \"123456\",\n  \"newPassword\": \"NewPassword@123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/user/reset-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "user", "reset-password"]
+            },
+            "description": "Reset user password using OTP verification."
+          },
+          "response": []
+        },
+        {
+          "name": "User Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.data && jsonData.data.accessToken) {",
+                  "        pm.collectionVariables.set('accessToken', jsonData.data.accessToken);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/user/refresh-token",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "user", "refresh-token"]
+            },
+            "description": "Refresh access token using refresh token."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Driver Auth",
+      "item": [
+        {
+          "name": "Driver Signup",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"+974XXXXXXXX\",\n  \"username\": \"driver_ali\",\n  \"password\": \"Password@123\",\n  \"vehicleDetails\": {\n    \"type\": \"sedan\",\n    \"make\": \"Toyota\",\n    \"model\": \"Camry\",\n    \"year\": 2022,\n    \"plateNumber\": \"ABC123\",\n    \"color\": \"White\"\n  },\n  \"bankDetails\": {\n    \"accountHolderName\": \"Ali Ahmed\",\n    \"bankName\": \"Qatar National Bank\",\n    \"accountNumber\": \"1234567890\",\n    \"iban\": \"QA12XXXXXXXXXXXXXXXXXXXX\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/driver/signup",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "driver", "signup"]
+            },
+            "description": "Register a new driver account. Sends OTP to phone number."
+          },
+          "response": []
+        },
+        {
+          "name": "Driver Verify OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"+974XXXXXXXX\",\n  \"otp\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/driver/verify-otp",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "driver", "verify-otp"]
+            },
+            "description": "Verify OTP sent to phone number during driver signup."
+          },
+          "response": []
+        },
+        {
+          "name": "Driver Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.data && jsonData.data.accessToken) {",
+                  "        pm.collectionVariables.set('accessToken', jsonData.data.accessToken);",
+                  "    }",
+                  "    if (jsonData.data && jsonData.data.refreshToken) {",
+                  "        pm.collectionVariables.set('refreshToken', jsonData.data.refreshToken);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"+974XXXXXXXX\",\n  \"password\": \"Password@123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/driver/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "driver", "login"]
+            },
+            "description": "Login driver with phone number and password. Returns access and refresh tokens."
+          },
+          "response": []
+        },
+        {
+          "name": "Driver Forgot Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"+974XXXXXXXX\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/driver/forgot-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "driver", "forgot-password"]
+            },
+            "description": "Request password reset OTP for driver account."
+          },
+          "response": []
+        },
+        {
+          "name": "Driver Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"+974XXXXXXXX\",\n  \"otp\": \"123456\",\n  \"newPassword\": \"NewPassword@123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/driver/reset-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "driver", "reset-password"]
+            },
+            "description": "Reset driver password using OTP verification."
+          },
+          "response": []
+        },
+        {
+          "name": "Driver Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.data && jsonData.data.accessToken) {",
+                  "        pm.collectionVariables.set('accessToken', jsonData.data.accessToken);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/driver/refresh-token",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "driver", "refresh-token"]
+            },
+            "description": "Refresh access token using refresh token."
+          },
+          "response": []
+        },
+        {
+          "name": "Driver Submit Documents",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "drivingLicense",
+                  "type": "file",
+                  "src": [],
+                  "description": "Driver's license document (image/pdf)"
+                },
+                {
+                  "key": "vehicleRegistration",
+                  "type": "file",
+                  "src": [],
+                  "description": "Vehicle registration document (image/pdf)"
+                },
+                {
+                  "key": "insurance",
+                  "type": "file",
+                  "src": [],
+                  "description": "Insurance document (image/pdf)"
+                },
+                {
+                  "key": "nationalId",
+                  "type": "file",
+                  "src": [],
+                  "description": "National ID document (image/pdf)"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/driver/submit-documents",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "driver", "submit-documents"]
+            },
+            "description": "Upload driver documents for verification. Requires authentication (Bearer token). Documents required: drivingLicense, vehicleRegistration, insurance, nationalId. Max file size: 5MB per file."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

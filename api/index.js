@@ -17,6 +17,9 @@ const utilsRoutes = require('../src/routes/utils.routes');
 // Initialize Express app
 const app = express();
 
+// Trust proxy - Required for Vercel serverless functions
+app.set('trust proxy', 1);
+
 // Security middleware
 app.use(helmet());
 
