@@ -3,7 +3,7 @@ const User = require('../models/User');
 const Driver = require('../models/Driver');
 const otpService = require('../services/otp.service');
 const smsService = require('../services/sms.service');
-const { generateAccessToken, generateRefreshToken, hashPassword, comparePassword } = require('../utils/helpers');
+const { generateAccessToken, generateRefreshToken, hashPassword, comparePassword, cleanPhoneNumber } = require('../utils/helpers');
 const { ValidationError, AuthenticationError } = require('../utils/errors');
 const { OTP_PURPOSE } = require('../config/constants');
 
@@ -29,7 +29,7 @@ exports.userSignup = asyncHandler(async (req, res) => {
   const { otpCode } = await otpService.generateOTP(phoneNumber, OTP_PURPOSE.SIGNUP);
 
   // Send OTP via SMS
-  await smsService.sendOTP(phoneNumber, otpCode);
+  await smsService.sendOTP(phoneNumber, otpCode, OTP_PURPOSE.SIGNUP);
 
   res.status(200).json({
     success: true,
@@ -196,7 +196,7 @@ exports.userForgotPassword = asyncHandler(async (req, res) => {
   const { otpCode } = await otpService.generateOTP(phoneNumber, OTP_PURPOSE.PASSWORD_RESET);
 
   // Send OTP via SMS
-  await smsService.sendOTP(phoneNumber, otpCode);
+  await smsService.sendOTP(phoneNumber, otpCode, OTP_PURPOSE.PASSWORD_RESET);
 
   res.status(200).json({
     success: true,
@@ -304,7 +304,7 @@ exports.driverSignup = asyncHandler(async (req, res) => {
   const { otpCode } = await otpService.generateOTP(phoneNumber, OTP_PURPOSE.SIGNUP);
 
   // Send OTP via SMS
-  await smsService.sendOTP(phoneNumber, otpCode);
+  await smsService.sendOTP(phoneNumber, otpCode, OTP_PURPOSE.SIGNUP);
 
   res.status(200).json({
     success: true,
@@ -476,7 +476,7 @@ exports.driverForgotPassword = asyncHandler(async (req, res) => {
   const { otpCode } = await otpService.generateOTP(phoneNumber, OTP_PURPOSE.PASSWORD_RESET);
 
   // Send OTP via SMS
-  await smsService.sendOTP(phoneNumber, otpCode);
+  await smsService.sendOTP(phoneNumber, otpCode, OTP_PURPOSE.PASSWORD_RESET);
 
   res.status(200).json({
     success: true,
@@ -739,11 +739,15 @@ exports.removeFcmToken = asyncHandler(async (req, res) => {
 
 // Request password reset (send OTP)
 exports.forgotPasswordRequest = asyncHandler(async (req, res) => {
-  const { phoneNumber, role } = req.body;
+  let { phoneNumber, role } = req.body;
 
   if (!phoneNumber || !role) {
     throw new ValidationError('Phone number and role are required');
   }
+
+  // Clean phone number - remove invisible Unicode characters and whitespace
+  phoneNumber = cleanPhoneNumber(phoneNumber);
+  console.log('🧹 Cleaned phone number:', phoneNumber);
 
   if (!['user', 'driver'].includes(role)) {
     throw new ValidationError('Role must be either "user" or "driver"');
@@ -765,7 +769,7 @@ exports.forgotPasswordRequest = asyncHandler(async (req, res) => {
   const { otpCode } = await otpService.generateOTP(phoneNumber, OTP_PURPOSE.PASSWORD_RESET);
 
   // Send OTP via SMS
-  await smsService.sendOTP(phoneNumber, otpCode);
+  await smsService.sendOTP(phoneNumber, otpCode, OTP_PURPOSE.PASSWORD_RESET);
 
   res.status(200).json({
     success: true,

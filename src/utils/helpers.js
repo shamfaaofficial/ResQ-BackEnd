@@ -220,6 +220,15 @@ const calculateDriverEarnings = (totalAmount, platformCommissionPercentage) => {
   };
 };
 
+/**
+ * Clean phone number - remove invisible Unicode characters
+ */
+const cleanPhoneNumber = (phoneNumber) => {
+  if (!phoneNumber) return phoneNumber;
+  // Remove Unicode direction marks and all whitespace
+  return phoneNumber.replace(/[\u200E\u200F\u202A-\u202E\s]/g, '').trim();
+};
+
 module.exports = {
   hashPassword,
   comparePassword,
@@ -237,5 +246,6 @@ module.exports = {
   errorResponse,
   sanitizeQuery,
   calculateTripPrice,
-  calculateDriverEarnings
+  calculateDriverEarnings,
+  cleanPhoneNumber
 };

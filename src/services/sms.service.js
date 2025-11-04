@@ -7,10 +7,16 @@ class SMSService {
    */
   async sendOTP(phoneNumber, otp, purpose) {
     try {
-      // Use phone number as-is (don't force Qatar format for testing)
-      const formattedPhone = phoneNumber;
+      // Ensure phone number has country code
+      let formattedPhone = phoneNumber;
+      if (!formattedPhone.startsWith('+')) {
+        // If no country code, assume Qatar
+        formattedPhone = `+974${phoneNumber}`;
+      }
 
       const messageBody = this.getOTPMessage(otp, purpose);
+
+      console.log(`📤 Attempting to send SMS to: ${formattedPhone}`);
 
       // Send SMS via Twilio
       const message = await twilioClient.messages.create({
@@ -19,10 +25,17 @@ class SMSService {
         to: formattedPhone
       });
 
-      console.log(`SMS sent to ${formattedPhone}: ${message.sid}`);
+      console.log(`✅ SMS sent successfully!`);
+      console.log(`   📱 To: ${formattedPhone}`);
+      console.log(`   🆔 SID: ${message.sid}`);
+      console.log(`   📊 Status: ${message.status}`);
+
       return { success: true, messageSid: message.sid };
     } catch (error) {
-      console.error('SMS sending failed:', error.message);
+      console.error('❌ SMS sending failed:', error.message);
+      console.error('Error code:', error.code);
+      console.error('Error details:', error);
+
       // In development, don't throw error to allow testing without Twilio
       if (process.env.NODE_ENV === 'development') {
         console.log(`\n⚠️  DEV MODE - SMS Failed but continuing...`);
