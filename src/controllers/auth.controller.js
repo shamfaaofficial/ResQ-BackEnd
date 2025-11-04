@@ -732,3 +732,128 @@ exports.removeFcmToken = asyncHandler(async (req, res) => {
     message: 'FCM token removed successfully'
   });
 });
+
+/**
+ * FORGOT PASSWORD
+ */
+
+// Request password reset (send OTP)
+exports.forgotPasswordRequest = asyncHandler(async (req, res) => {
+  const { phoneNumber, role } = req.body;
+
+  if (!phoneNumber || !role) {
+    throw new ValidationError('Phone number and role are required');
+  }
+
+  if (!['user', 'driver'].includes(role)) {
+    throw new ValidationError('Role must be either "user" or "driver"');
+  }
+
+  // Check if user/driver exists
+  let userExists;
+  if (role === 'driver') {
+    userExists = await Driver.findOne({ phoneNumber });
+  } else {
+    userExists = await User.findOne({ phoneNumber, role: 'user' });
+  }
+
+  if (!userExists) {
+    throw new ValidationError('No account found with this phone number');
+  }
+
+  // Generate OTP
+  const { otpCode } = await otpService.generateOTP(phoneNumber, OTP_PURPOSE.PASSWORD_RESET);
+
+  // Send OTP via SMS
+  await smsService.sendOTP(phoneNumber, otpCode);
+
+  res.status(200).json({
+    success: true,
+    message: 'OTP sent successfully to your phone number',
+    data: {
+      phoneNumber,
+      expiresIn: '5 minutes'
+    }
+  });
+});
+
+// Verify OTP for password reset
+exports.forgotPasswordVerifyOTP = asyncHandler(async (req, res) => {
+  const { phoneNumber, otp } = req.body;
+
+  if (!phoneNumber || !otp) {
+    throw new ValidationError('Phone number and OTP are required');
+  }
+
+  // Verify OTP
+  await otpService.verifyOTP(phoneNumber, otp, OTP_PURPOSE.PASSWORD_RESET);
+
+  res.status(200).json({
+    success: true,
+    message: 'OTP verified successfully',
+    data: {
+      verified: true,
+      phoneNumber
+    }
+  });
+});
+
+// Reset password
+exports.forgotPasswordReset = asyncHandler(async (req, res) => {
+  const { phoneNumber, otp, newPassword, role } = req.body;
+
+  if (!phoneNumber || !otp || !newPassword || !role) {
+    throw new ValidationError('Phone number, OTP, new password, and role are required');
+  }
+
+  if (!['user', 'driver'].includes(role)) {
+    throw new ValidationError('Role must be either "user" or "driver"');
+  }
+
+  // Validate password strength
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+  if (!passwordRegex.test(newPassword)) {
+    throw new ValidationError('Password must be at least 8 characters with uppercase, lowercase, number and special character');
+  }
+
+  // Verify OTP one more time
+  const otpValid = await otpService.validateOTP(phoneNumber, otp, OTP_PURPOSE.PASSWORD_RESET);
+  if (!otpValid) {
+    throw new ValidationError('Invalid or expired OTP');
+  }
+
+  // Find user/driver
+  let user;
+  if (role === 'driver') {
+    user = await Driver.findOne({ phoneNumber });
+  } else {
+    user = await User.findOne({ phoneNumber, role: 'user' });
+  }
+
+  if (!user) {
+    throw new ValidationError('User not found');
+  }
+
+  // Hash new password
+  const hashedPassword = await hashPassword(newPassword);
+
+  // Update password
+  user.password = hashedPassword;
+
+  // Invalidate all existing refresh tokens (force re-login on all devices)
+  user.refreshTokens = [];
+
+  await user.save();
+
+  // Delete the used OTP
+  await otpService.deleteOTP(phoneNumber, OTP_PURPOSE.PASSWORD_RESET);
+
+  res.status(200).json({
+    success: true,
+    message: 'Password reset successfully. Please login with your new password.',
+    data: {
+      phoneNumber,
+      passwordUpdated: true
+    }
+  });
+});

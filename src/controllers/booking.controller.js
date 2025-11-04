@@ -439,10 +439,17 @@ exports.acceptBooking = asyncHandler(async (req, res) => {
 
   await booking.populate('userId', 'phoneNumber profile');
 
+  // Prepare response without dropoff location (hidden until trip starts)
+  const bookingResponse = booking.toObject();
+  delete bookingResponse.dropoffLocation;
+
   res.status(200).json({
     success: true,
     message: 'Booking accepted successfully',
-    data: { booking }
+    data: {
+      booking: bookingResponse,
+      note: 'Dropoff location will be revealed when trip starts'
+    }
   });
 });
 
@@ -467,10 +474,23 @@ exports.getDriverActiveBooking = asyncHandler(async (req, res) => {
   .populate('userId', 'phoneNumber profile')
   .sort({ createdAt: -1 });
 
+  if (!booking) {
+    return res.status(200).json({
+      success: true,
+      data: { booking: null }
+    });
+  }
+
+  // Hide dropoff location until trip starts (IN_PROGRESS status)
+  const bookingResponse = booking.toObject();
+  if (booking.status !== BOOKING_STATUS.IN_PROGRESS && booking.status !== BOOKING_STATUS.COMPLETED) {
+    delete bookingResponse.dropoffLocation;
+  }
+
   res.status(200).json({
     success: true,
     data: {
-      booking: booking || null
+      booking: bookingResponse
     }
   });
 });
@@ -526,9 +546,12 @@ exports.startTrip = asyncHandler(async (req, res) => {
   booking.timeline.startedAt = new Date();
   await booking.save();
 
+  // Now reveal the full booking including dropoff location
+  await booking.populate('userId', 'phoneNumber profile');
+
   res.status(200).json({
     success: true,
-    message: 'Trip started',
+    message: 'Trip started - dropoff location now available',
     data: { booking }
   });
 });

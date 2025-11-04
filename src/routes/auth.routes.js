@@ -9,8 +9,6 @@ router.post('/user/signup', authController.userSignup);
 router.post('/user/verify-otp', authController.userVerifyOTP);
 router.post('/user/complete-signup', authController.userCompleteSignup);
 router.post('/user/login', authController.userLogin);
-router.post('/user/forgot-password', authController.userForgotPassword);
-router.post('/user/reset-password', authController.userResetPassword);
 router.post('/user/refresh-token', authController.userRefreshToken);
 
 // Driver Authentication Routes
@@ -18,8 +16,6 @@ router.post('/driver/signup', authController.driverSignup);
 router.post('/driver/verify-otp', authController.driverVerifyOTP);
 router.post('/driver/complete-signup', authController.driverCompleteSignup);
 router.post('/driver/login', authController.driverLogin);
-router.post('/driver/forgot-password', authController.driverForgotPassword);
-router.post('/driver/reset-password', authController.driverResetPassword);
 router.post('/driver/refresh-token', authController.driverRefreshToken);
 
 // Driver Document Upload (Protected)
@@ -40,5 +36,14 @@ router.post('/admin/login', authController.adminLogin);
 
 // Logout (Protected)
 router.post('/logout', authMiddleware, authController.logout);
+
+// Forgot Password Routes (Unified for both user and driver)
+router.post('/forgot-password/request', authController.forgotPasswordRequest);
+router.post('/forgot-password/verify-otp', authController.forgotPasswordVerifyOTP);
+router.post('/forgot-password/reset', authController.forgotPasswordReset);
+
+// FCM Token Management (Protected)
+router.post('/fcm-token', authMiddleware, authController.updateFcmToken);
+router.delete('/fcm-token', authMiddleware, authController.removeFcmToken);
 
 module.exports = router;
