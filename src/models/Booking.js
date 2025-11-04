@@ -29,7 +29,7 @@ const bookingSchema = new mongoose.Schema({
   vehicleType: {
     type: String,
     enum: Object.values(VEHICLE_TYPES),
-    required: true
+    required: false
   },
   pickupLocation: {
     type: {

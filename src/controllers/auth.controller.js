@@ -43,19 +43,32 @@ exports.userSignup = asyncHandler(async (req, res) => {
 
 // Verify OTP only
 exports.userVerifyOTP = asyncHandler(async (req, res) => {
+  console.log('📱 [userVerifyOTP] Request received');
+  console.log('📱 [userVerifyOTP] Request body:', JSON.stringify(req.body));
+
   const { phoneNumber, otp } = req.body;
 
   // Validate required fields
   if (!phoneNumber || !otp) {
+    console.log('❌ [userVerifyOTP] Missing required fields');
     throw new ValidationError('Phone number and OTP are required');
   }
 
+  console.log('📱 [userVerifyOTP] Extracted phoneNumber:', phoneNumber);
+  console.log('📱 [userVerifyOTP] Extracted OTP:', otp);
+  console.log('📱 [userVerifyOTP] OTP Purpose:', OTP_PURPOSE.SIGNUP);
+
   // Verify OTP
+  console.log('🔍 [userVerifyOTP] Calling otpService.verifyOTP...');
   const isValid = await otpService.verifyOTP(phoneNumber, otp, OTP_PURPOSE.SIGNUP);
+  console.log('🔍 [userVerifyOTP] OTP verification result:', isValid);
+
   if (!isValid) {
+    console.log('❌ [userVerifyOTP] OTP verification failed');
     throw new ValidationError('Invalid or expired OTP');
   }
 
+  console.log('✅ [userVerifyOTP] OTP verified successfully');
   res.status(200).json({
     success: true,
     message: 'OTP verified successfully',
@@ -68,11 +81,11 @@ exports.userVerifyOTP = asyncHandler(async (req, res) => {
 
 // Complete user signup after OTP verification
 exports.userCompleteSignup = asyncHandler(async (req, res) => {
-  const { phoneNumber, username, password, firstName, lastName, email } = req.body;
+  const { phoneNumber, password } = req.body;
 
   // Validate required fields
-  if (!phoneNumber || !username || !password || !firstName) {
-    throw new ValidationError('All required fields must be provided');
+  if (!phoneNumber || !password) {
+    throw new ValidationError('Phone number and password are required');
   }
 
   // Check if user already exists
@@ -81,24 +94,15 @@ exports.userCompleteSignup = asyncHandler(async (req, res) => {
     throw new ValidationError('User with this phone number already exists');
   }
 
-  // Check if username already exists
-  const existingUsername = await User.findOne({ username });
-  if (existingUsername) {
-    throw new ValidationError('Username already taken');
-  }
-
   // Hash password
   const hashedPassword = await hashPassword(password);
 
   // Create user
   const user = await User.create({
     phoneNumber,
-    username,
     password: hashedPassword,
-    firstName,
-    lastName,
-    email,
     role: 'user',
+    isVerified: true,
     isActive: true
   });
 
@@ -107,20 +111,16 @@ exports.userCompleteSignup = asyncHandler(async (req, res) => {
   const refreshToken = generateRefreshToken(user._id, user.role);
 
   // Save refresh token
-  user.refreshToken = refreshToken;
+  user.refreshTokens = [{ token: refreshToken }];
   await user.save();
 
   res.status(201).json({
     success: true,
-    message: 'User account created successfully',
+    message: 'Account created successfully',
     data: {
       user: {
         id: user._id,
-        username: user.username,
         phoneNumber: user.phoneNumber,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
         role: user.role
       },
       accessToken,
@@ -131,14 +131,14 @@ exports.userCompleteSignup = asyncHandler(async (req, res) => {
 
 // User login
 exports.userLogin = asyncHandler(async (req, res) => {
-  const { username, password } = req.body;
+  const { phoneNumber, password } = req.body;
 
-  if (!username || !password) {
-    throw new ValidationError('Username and password are required');
+  if (!phoneNumber || !password) {
+    throw new ValidationError('Phone number and password are required');
   }
 
-  // Find user
-  const user = await User.findOne({ username, role: 'user' });
+  // Find user (include password for verification)
+  const user = await User.findOne({ phoneNumber, role: 'user' }).select('+password');
   if (!user) {
     throw new AuthenticationError('Invalid credentials');
   }
@@ -158,9 +158,9 @@ exports.userLogin = asyncHandler(async (req, res) => {
   const accessToken = generateAccessToken(user._id, user.role);
   const refreshToken = generateRefreshToken(user._id, user.role);
 
-  // Save refresh token
-  user.refreshToken = refreshToken;
-  user.lastLogin = new Date();
+  // Clean expired tokens and add new refresh token
+  user.cleanExpiredTokens();
+  user.refreshTokens.push({ token: refreshToken });
   await user.save();
 
   res.status(200).json({
@@ -169,11 +169,7 @@ exports.userLogin = asyncHandler(async (req, res) => {
     data: {
       user: {
         id: user._id,
-        username: user.username,
         phoneNumber: user.phoneNumber,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
         role: user.role
       },
       accessToken,
@@ -264,7 +260,13 @@ exports.userRefreshToken = asyncHandler(async (req, res) => {
 
   // Find user and verify refresh token matches
   const user = await User.findById(decoded.userId);
-  if (!user || user.refreshToken !== refreshToken) {
+  if (!user) {
+    throw new AuthenticationError('Invalid refresh token');
+  }
+
+  // Check if refresh token exists in user's tokens array
+  const tokenExists = user.refreshTokens.some(rt => rt.token === refreshToken);
+  if (!tokenExists) {
     throw new AuthenticationError('Invalid refresh token');
   }
 
@@ -341,61 +343,56 @@ exports.driverVerifyOTP = asyncHandler(async (req, res) => {
 
 // Complete driver signup after OTP verification
 exports.driverCompleteSignup = asyncHandler(async (req, res) => {
-  const { phoneNumber, username, password, firstName, lastName, email } = req.body;
+  const { phoneNumber, password } = req.body;
 
   // Validate required fields
-  if (!phoneNumber || !username || !password || !firstName) {
-    throw new ValidationError('All required fields must be provided');
+  if (!phoneNumber || !password) {
+    throw new ValidationError('Phone number and password are required');
   }
 
-  // Check if driver already exists
-  const existingDriver = await Driver.findOne({ phoneNumber });
-  if (existingDriver) {
-    throw new ValidationError('Driver with this phone number already exists');
-  }
-
-  // Check if username already exists
-  const existingUsername = await Driver.findOne({ username });
-  if (existingUsername) {
-    throw new ValidationError('Username already taken');
+  // Check if user already exists
+  const existingUser = await User.findOne({ phoneNumber });
+  if (existingUser) {
+    throw new ValidationError('User with this phone number already exists');
   }
 
   // Hash password
   const hashedPassword = await hashPassword(password);
 
-  // Create driver with pending approval status
-  const driver = await Driver.create({
+  // Create user with driver role
+  const user = await User.create({
     phoneNumber,
-    username,
     password: hashedPassword,
-    firstName,
-    lastName,
-    email,
     role: 'driver',
-    isActive: true,
+    isVerified: true,
+    isActive: true
+  });
+
+  // Create driver profile linked to user
+  const driver = await Driver.create({
+    userId: user._id,
     approvalStatus: 'pending'
   });
 
   // Generate tokens
-  const accessToken = generateAccessToken(driver._id, driver.role);
-  const refreshToken = generateRefreshToken(driver._id, driver.role);
+  const accessToken = generateAccessToken(user._id, user.role);
+  const refreshToken = generateRefreshToken(user._id, user.role);
 
   // Save refresh token
-  driver.refreshToken = refreshToken;
-  await driver.save();
+  user.refreshTokens = [{ token: refreshToken }];
+  await user.save();
 
   res.status(201).json({
     success: true,
     message: 'Driver account created successfully. Please submit your documents for verification.',
     data: {
+      user: {
+        id: user._id,
+        phoneNumber: user.phoneNumber,
+        role: user.role
+      },
       driver: {
         id: driver._id,
-        username: driver.username,
-        phoneNumber: driver.phoneNumber,
-        firstName: driver.firstName,
-        lastName: driver.lastName,
-        email: driver.email,
-        role: driver.role,
         approvalStatus: driver.approvalStatus
       },
       accessToken,
@@ -406,53 +403,55 @@ exports.driverCompleteSignup = asyncHandler(async (req, res) => {
 
 // Driver login
 exports.driverLogin = asyncHandler(async (req, res) => {
-  const { username, password } = req.body;
+  const { phoneNumber, password } = req.body;
 
-  if (!username || !password) {
-    throw new ValidationError('Username and password are required');
+  if (!phoneNumber || !password) {
+    throw new ValidationError('Phone number and password are required');
   }
 
-  // Find driver
-  const driver = await Driver.findOne({ username, role: 'driver' });
-  if (!driver) {
+  // Find user with driver role (include password for verification)
+  const user = await User.findOne({ phoneNumber, role: 'driver' }).select('+password');
+  if (!user) {
     throw new AuthenticationError('Invalid credentials');
   }
 
   // Check if account is active
-  if (!driver.isActive) {
+  if (!user.isActive) {
     throw new AuthenticationError('Account is deactivated');
   }
 
   // Verify password
-  const isPasswordValid = await comparePassword(password, driver.password);
+  const isPasswordValid = await comparePassword(password, user.password);
   if (!isPasswordValid) {
     throw new AuthenticationError('Invalid credentials');
   }
 
-  // Generate tokens
-  const accessToken = generateAccessToken(driver._id, driver.role);
-  const refreshToken = generateRefreshToken(driver._id, driver.role);
+  // Find driver profile
+  const driver = await Driver.findOne({ userId: user._id });
 
-  // Save refresh token
-  driver.refreshToken = refreshToken;
-  driver.lastLogin = new Date();
-  await driver.save();
+  // Generate tokens
+  const accessToken = generateAccessToken(user._id, user.role);
+  const refreshToken = generateRefreshToken(user._id, user.role);
+
+  // Clean expired tokens and add new refresh token
+  user.cleanExpiredTokens();
+  user.refreshTokens.push({ token: refreshToken });
+  await user.save();
 
   res.status(200).json({
     success: true,
     message: 'Login successful',
     data: {
-      driver: {
+      user: {
+        id: user._id,
+        phoneNumber: user.phoneNumber,
+        role: user.role
+      },
+      driver: driver ? {
         id: driver._id,
-        username: driver.username,
-        phoneNumber: driver.phoneNumber,
-        firstName: driver.firstName,
-        lastName: driver.lastName,
-        email: driver.email,
-        role: driver.role,
         approvalStatus: driver.approvalStatus,
         isOnline: driver.isOnline
-      },
+      } : null,
       accessToken,
       refreshToken
     }
@@ -467,9 +466,9 @@ exports.driverForgotPassword = asyncHandler(async (req, res) => {
     throw new ValidationError('Phone number is required');
   }
 
-  // Check if driver exists
-  const driver = await Driver.findOne({ phoneNumber, role: 'driver' });
-  if (!driver) {
+  // Check if user with driver role exists
+  const user = await User.findOne({ phoneNumber, role: 'driver' });
+  if (!user) {
     throw new ValidationError('No driver found with this phone number');
   }
 
@@ -503,9 +502,9 @@ exports.driverResetPassword = asyncHandler(async (req, res) => {
     throw new ValidationError('Invalid or expired OTP');
   }
 
-  // Find driver
-  const driver = await Driver.findOne({ phoneNumber, role: 'driver' });
-  if (!driver) {
+  // Find user with driver role
+  const user = await User.findOne({ phoneNumber, role: 'driver' });
+  if (!user) {
     throw new ValidationError('Driver not found');
   }
 
@@ -513,8 +512,8 @@ exports.driverResetPassword = asyncHandler(async (req, res) => {
   const hashedPassword = await hashPassword(newPassword);
 
   // Update password
-  driver.password = hashedPassword;
-  await driver.save();
+  user.password = hashedPassword;
+  await user.save();
 
   res.status(200).json({
     success: true,
@@ -539,14 +538,20 @@ exports.driverRefreshToken = asyncHandler(async (req, res) => {
     throw new AuthenticationError('Invalid or expired refresh token');
   }
 
-  // Find driver and verify refresh token matches
-  const driver = await Driver.findById(decoded.userId);
-  if (!driver || driver.refreshToken !== refreshToken) {
+  // Find user (driver) and verify refresh token matches
+  const user = await User.findById(decoded.userId);
+  if (!user || user.role !== 'driver') {
+    throw new AuthenticationError('Invalid refresh token');
+  }
+
+  // Check if refresh token exists in user's tokens array
+  const tokenExists = user.refreshTokens.some(rt => rt.token === refreshToken);
+  if (!tokenExists) {
     throw new AuthenticationError('Invalid refresh token');
   }
 
   // Generate new access token
-  const accessToken = generateAccessToken(driver._id, driver.role);
+  const accessToken = generateAccessToken(user._id, user.role);
 
   res.status(200).json({
     success: true,
@@ -661,5 +666,69 @@ exports.logout = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
     message: 'Logged out successfully'
+  });
+});
+
+/**
+ * FCM TOKEN MANAGEMENT
+ */
+
+// Update FCM token for user or driver
+exports.updateFcmToken = asyncHandler(async (req, res) => {
+  const { fcmToken } = req.body;
+
+  if (!fcmToken) {
+    throw new ValidationError('FCM token is required');
+  }
+
+  const userId = req.userId;
+  const userRole = req.userRole;
+
+  // Update user's FCM token
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new ValidationError('User not found');
+  }
+
+  user.fcmToken = fcmToken;
+  await user.save();
+
+  // If driver, also update driver's FCM token
+  if (userRole === 'driver') {
+    const driver = await Driver.findOne({ userId });
+    if (driver) {
+      driver.fcmToken = fcmToken;
+      await driver.save();
+    }
+  }
+
+  res.status(200).json({
+    success: true,
+    message: 'FCM token updated successfully'
+  });
+});
+
+// Remove FCM token (on logout or token invalidation)
+exports.removeFcmToken = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+  const userRole = req.userRole;
+
+  const user = await User.findById(userId);
+  if (user) {
+    user.fcmToken = null;
+    await user.save();
+  }
+
+  if (userRole === 'driver') {
+    const driver = await Driver.findOne({ userId });
+    if (driver) {
+      driver.fcmToken = null;
+      await driver.save();
+    }
+  }
+
+  res.status(200).json({
+    success: true,
+    message: 'FCM token removed successfully'
   });
 });

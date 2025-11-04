@@ -15,8 +15,9 @@ const userSchema = new mongoose.Schema({
   },
   username: {
     type: String,
-    required: true,
+    required: false,
     unique: true,
+    sparse: true,
     index: true,
     trim: true,
     lowercase: true
@@ -42,12 +43,12 @@ const userSchema = new mongoose.Schema({
   profile: {
     firstName: {
       type: String,
-      required: true,
+      required: false,
       trim: true
     },
     lastName: {
       type: String,
-      required: true,
+      required: false,
       trim: true
     },
     email: {
@@ -70,7 +71,11 @@ const userSchema = new mongoose.Schema({
       type: Date,
       default: Date.now
     }
-  }]
+  }],
+  fcmToken: {
+    type: String,
+    default: null
+  }
 }, {
   timestamps: true
 });

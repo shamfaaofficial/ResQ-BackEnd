@@ -1,0 +1,134 @@
+const express = require('express');
+const router = express.Router();
+const bookingController = require('../controllers/booking.controller');
+const { authMiddleware, roleMiddleware } = require('../middlewares/auth');
+
+/**
+ * USER BOOKING ROUTES
+ */
+
+// Get nearby drivers (protected - user only)
+router.get(
+  '/nearby-drivers',
+  authMiddleware,
+  roleMiddleware('user'),
+  bookingController.getNearbyDrivers
+);
+
+// Get price estimate (protected - user only)
+router.get(
+  '/price-estimate',
+  authMiddleware,
+  roleMiddleware('user'),
+  bookingController.getPriceEstimate
+);
+
+// Create booking (protected - user only)
+router.post(
+  '/',
+  authMiddleware,
+  roleMiddleware('user'),
+  bookingController.createBooking
+);
+
+// Get user's active booking (protected - user only)
+router.get(
+  '/user/active',
+  authMiddleware,
+  roleMiddleware('user'),
+  bookingController.getUserActiveBooking
+);
+
+// Cancel booking (protected - user only)
+router.patch(
+  '/user/:bookingId/cancel',
+  authMiddleware,
+  roleMiddleware('user'),
+  bookingController.cancelBooking
+);
+
+// Get user's booking history (protected - user only)
+router.get(
+  '/user/history',
+  authMiddleware,
+  roleMiddleware('user'),
+  bookingController.getUserBookingHistory
+);
+
+// Request specific driver (protected - user only)
+router.post(
+  '/request-driver',
+  authMiddleware,
+  roleMiddleware('user'),
+  bookingController.requestSpecificDriver
+);
+
+/**
+ * DRIVER BOOKING ROUTES
+ */
+
+// Get available bookings for driver (protected - driver only)
+router.get(
+  '/driver/available',
+  authMiddleware,
+  roleMiddleware('driver'),
+  bookingController.getAvailableBookings
+);
+
+// Accept booking (protected - driver only)
+router.patch(
+  '/driver/:bookingId/accept',
+  authMiddleware,
+  roleMiddleware('driver'),
+  bookingController.acceptBooking
+);
+
+// Get driver's active booking (protected - driver only)
+router.get(
+  '/driver/active',
+  authMiddleware,
+  roleMiddleware('driver'),
+  bookingController.getDriverActiveBooking
+);
+
+// Mark driver arrived (protected - driver only)
+router.patch(
+  '/driver/:bookingId/arrived',
+  authMiddleware,
+  roleMiddleware('driver'),
+  bookingController.markDriverArrived
+);
+
+// Start trip (protected - driver only)
+router.patch(
+  '/driver/:bookingId/start',
+  authMiddleware,
+  roleMiddleware('driver'),
+  bookingController.startTrip
+);
+
+// Complete trip (protected - driver only)
+router.patch(
+  '/driver/:bookingId/complete',
+  authMiddleware,
+  roleMiddleware('driver'),
+  bookingController.completeTrip
+);
+
+// Cancel booking by driver (protected - driver only)
+router.patch(
+  '/driver/:bookingId/cancel',
+  authMiddleware,
+  roleMiddleware('driver'),
+  bookingController.cancelBookingByDriver
+);
+
+// Get driver's booking history (protected - driver only)
+router.get(
+  '/driver/history',
+  authMiddleware,
+  roleMiddleware('driver'),
+  bookingController.getDriverBookingHistory
+);
+
+module.exports = router;

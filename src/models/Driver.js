@@ -12,31 +12,31 @@ const driverSchema = new mongoose.Schema({
     vehicleType: {
       type: String,
       enum: Object.values(VEHICLE_TYPES),
-      required: true
+      required: false
     },
     vehicleNumber: {
       type: String,
-      required: true,
+      required: false,
       trim: true,
       uppercase: true
     },
     vehicleMake: {
       type: String,
-      required: true,
+      required: false,
       trim: true
     },
     vehicleModel: {
       type: String,
-      required: true,
+      required: false,
       trim: true
     },
     vehicleYear: {
       type: Number,
-      required: true
+      required: false
     },
     vehicleColor: {
       type: String,
-      required: true,
+      required: false,
       trim: true
     },
     vehicleImages: [{
@@ -149,6 +149,10 @@ const driverSchema = new mongoose.Schema({
   isLocationEnabled: {
     type: Boolean,
     default: false
+  },
+  fcmToken: {
+    type: String,
+    default: null
   }
 }, {
   timestamps: true

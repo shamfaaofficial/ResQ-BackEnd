@@ -1,11 +1,12 @@
 const Notification = require('../models/Notification');
 const { NOTIFICATION_TYPE } = require('../config/constants');
+const firebaseService = require('./firebase.service');
 
 class NotificationService {
   /**
    * Create notification for user
    */
-  async createNotification({ userId, driverId, bookingId, type, title, message, data = {} }) {
+  async createNotification({ userId, driverId, bookingId, type, title, message, data = {}, dataOnly = false }) {
     try {
       const notification = await Notification.create({
         userId,
@@ -17,7 +18,21 @@ class NotificationService {
         data
       });
 
-      // TODO: Send push notification here (FCM, OneSignal, etc.)
+      // Send push notification via Firebase
+      if (userId) {
+        await firebaseService.sendPushToUser(userId, title, message, {
+          ...data,
+          notificationId: notification._id.toString(),
+          type
+        }, dataOnly);
+      } else if (driverId) {
+        await firebaseService.sendPushToDriver(driverId, title, message, {
+          ...data,
+          notificationId: notification._id.toString(),
+          type
+        }, dataOnly);
+      }
+
       console.log(`Notification created: ${type} - ${title}`);
 
       return notification;
@@ -44,14 +59,28 @@ class NotificationService {
   /**
    * Notify driver about new booking
    */
-  async notifyDriverNewBooking(driverId, bookingId, pickupAddress) {
+  async notifyDriverNewBooking(driverId, bookingId, pickupAddress, additionalData = {}) {
+    const { eta, pricing, bookingNumber } = additionalData;
+
+    let message = `New tow request at ${pickupAddress}. Accept within 1 minute.`;
+    if (eta) {
+      message = `New tow request at ${pickupAddress}. ETA: ${eta} min. Accept within 1 minute.`;
+    }
+
     return this.createNotification({
       driverId,
       bookingId,
       type: NOTIFICATION_TYPE.BOOKING_REQUEST,
       title: 'New Booking Request',
-      message: `New tow request at ${pickupAddress}. Accept within 1 minute.`,
-      data: { bookingId, pickupAddress }
+      message,
+      data: {
+        bookingId: bookingId?.toString(),
+        pickupAddress,
+        eta: eta?.toString(),
+        pricing: pricing?.toString(),
+        bookingNumber
+      },
+      dataOnly: true // Send data-only message for booking requests
     });
   }
 

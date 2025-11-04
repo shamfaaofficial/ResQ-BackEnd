@@ -62,6 +62,21 @@ class GoogleMapsService {
       throw new Error(`Place details fetch failed: ${error.message}`);
     }
   }
+
+  async getDirections(origin, destination) {
+    try {
+      const response = await axios.get(`${this.baseURL}/directions/json`, {
+        params: {
+          origin: `${origin.latitude},${origin.longitude}`,
+          destination: `${destination.latitude},${destination.longitude}`,
+          key: this.apiKey
+        }
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(`Directions fetch failed: ${error.message}`);
+    }
+  }
 }
 
 module.exports = new GoogleMapsService();

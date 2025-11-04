@@ -13,6 +13,7 @@ const userRoutes = require('./routes/user.routes');
 const driverRoutes = require('./routes/driver.routes');
 const adminRoutes = require('./routes/admin.routes');
 const utilsRoutes = require('./routes/utils.routes');
+const bookingRoutes = require('./routes/booking.routes');
 
 // Initialize Express app
 const app = express();
@@ -54,8 +55,9 @@ app.get('/health', (req, res) => {
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/user', userRoutes);
 app.use('/api/v1/driver', driverRoutes);
+app.use('/api/v1/bookings', bookingRoutes);
 app.use('/api/v1/admin', adminRoutes);
-app.use('/api/v1/utils', utilsRoutes);
+app.use('/api/v1/utils',  utilsRoutes);
 
 // Serve uploaded files
 app.use('/uploads', express.static('uploads'));
@@ -82,11 +84,23 @@ const startServer = async () => {
     // Connect to MongoDB
     await connectDatabase();
 
+    // Connect to Redis (optional - app works without it)
+    const { connectRedis } = require('./config/redis');
+    await connectRedis();
+
     // Start background jobs
     require('./jobs/booking.job');
 
+    // Start HTTP server
+    const http = require('http');
+    const server = http.createServer(app);
+
+    // Initialize Socket.io
+    const { initializeSocket } = require('./config/socket');
+    initializeSocket(server);
+
     // Start server
-    app.listen(PORT, () => {
+    server.listen(PORT, () => {
       console.log(`
 ╔═══════════════════════════════════════╗
 ║   RESQ Backend API Server Started    ║

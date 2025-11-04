@@ -1,8 +1,32 @@
 const express = require('express');
 const router = express.Router();
-// const userController = require('../controllers/user.controller');
-// const { authMiddleware, roleMiddleware } = require('../middlewares/auth');
-// const { ROLES } = require('../config/constants');
+const bookingController = require('../controllers/booking.controller');
+const authController = require('../controllers/auth.controller');
+const { authMiddleware, roleMiddleware } = require('../middlewares/auth');
+
+// Get nearby drivers (protected - user only)
+router.get(
+  '/nearby-drivers',
+  authMiddleware,
+  roleMiddleware('user'),
+  bookingController.getNearbyDrivers
+);
+
+// Update FCM token (protected - user only)
+router.post(
+  '/fcm-token',
+  authMiddleware,
+  roleMiddleware('user'),
+  authController.updateFcmToken
+);
+
+// Remove FCM token (protected - user only)
+router.delete(
+  '/fcm-token',
+  authMiddleware,
+  roleMiddleware('user'),
+  authController.removeFcmToken
+);
 
 // Placeholder route
 router.get('/status', (req, res) => {

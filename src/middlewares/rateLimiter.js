@@ -1,4 +1,6 @@
 const rateLimit = require('express-rate-limit');
+const RedisStore = require('rate-limit-redis');
+const { getRedisClient, isRedisAvailable } = require('../config/redis');
 
 // General API rate limiter
 const generalLimiter = rateLimit({
@@ -74,9 +76,41 @@ const paymentLimiter = rateLimit({
   }
 });
 
+// Location update limiter - 4 requests per minute (every 15-20 seconds)
+const locationUpdateLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 4, // 4 updates per minute (every 15 seconds minimum)
+  message: {
+    success: false,
+    error: {
+      code: 'LOCATION_UPDATE_LIMIT_EXCEEDED',
+      message: 'Location updates too frequent, please wait'
+    }
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  // Use Redis store if available (for multi-server support)
+  store: isRedisAvailable() ? new RedisStore({
+    sendCommand: (...args) => getRedisClient().sendCommand(args),
+    prefix: 'ratelimit:location:'
+  }) : undefined,
+  // Use driver ID instead of IP for rate limiting
+  keyGenerator: (req) => {
+    // Use userId for authenticated requests, no IP fallback needed
+    return req.userId ? req.userId.toString() : 'anonymous';
+  },
+  validate: {
+    xForwardedForHeader: false,
+    trustProxy: true,
+    // Disable IP validation since we're using userId
+    ip: false
+  }
+});
+
 module.exports = {
   generalLimiter,
   authLimiter,
   otpLimiter,
-  paymentLimiter
+  paymentLimiter,
+  locationUpdateLimiter
 };

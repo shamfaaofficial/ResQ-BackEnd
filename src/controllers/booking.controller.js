@@ -1,0 +1,803 @@
+const asyncHandler = require('express-async-handler');
+const Booking = require('../models/Booking');
+const Driver = require('../models/Driver');
+const User = require('../models/User');
+const PricingConfig = require('../models/PricingConfig');
+const mapsService = require('../services/maps.service');
+const notificationService = require('../services/notification.service');
+const { ValidationError, NotFoundError } = require('../utils/errors');
+const { BOOKING_STATUS, BOOKING_REQUEST_TIMEOUT_SECONDS, PAYMENT_TIMEOUT_SECONDS } = require('../config/constants');
+const redisService = require('../services/redis.service');
+const { isRedisAvailable } = require('../config/redis');
+
+/**
+ * USER BOOKING APIS
+ */
+
+// Get nearby available drivers
+exports.getNearbyDrivers = asyncHandler(async (req, res) => {
+  const { latitude, longitude, radius = 10 } = req.query;
+
+  if (!latitude || !longitude) {
+    throw new ValidationError('Latitude and longitude are required');
+  }
+
+  const lat = parseFloat(latitude);
+  const lng = parseFloat(longitude);
+  const radiusKm = parseFloat(radius);
+
+  let nearbyDrivers = [];
+  let source = 'mongodb'; // Track data source
+
+  // TRY REDIS FIRST (100x faster)
+  if (isRedisAvailable()) {
+    const redisResults = await redisService.findNearbyDrivers(lng, lat, radiusKm, 20);
+
+    if (redisResults && redisResults.length > 0) {
+      // Get driver details from MongoDB for the nearby driver IDs
+      const driverIds = redisResults.map(r => r.driverId);
+
+      const drivers = await Driver.find({
+        _id: { $in: driverIds },
+        isOnline: true
+        // Note: Removed approvalStatus check temporarily as per earlier request
+      })
+      .populate('userId', 'phoneNumber profile')
+      .select('userId vehicleDetails currentLocation rating isOnline')
+      .lean();
+
+      // Map drivers with distance from Redis
+      nearbyDrivers = drivers.map(driver => {
+        const redisData = redisResults.find(r => r.driverId === driver._id.toString());
+        return {
+          id: driver._id,
+          location: {
+            latitude: driver.currentLocation.coordinates[1],
+            longitude: driver.currentLocation.coordinates[0],
+            address: driver.currentLocation.address
+          },
+          vehicleType: driver.vehicleDetails?.vehicleType,
+          vehicleNumber: driver.vehicleDetails?.vehicleNumber,
+          rating: driver.rating?.average || 0,
+          totalRatings: driver.rating?.totalRatings || 0,
+          distance: redisData ? redisData.distance : null
+        };
+      });
+
+      // Sort by distance (closest first)
+      nearbyDrivers.sort((a, b) => a.distance - b.distance);
+      source = 'redis';
+    }
+  }
+
+  // FALLBACK TO MONGODB if Redis unavailable or no results
+  if (nearbyDrivers.length === 0) {
+    const radiusInMeters = radiusKm * 1000;
+
+    const drivers = await Driver.find({
+      isOnline: true,
+      // approvalStatus: 'approved', // Commented out as per earlier request
+      currentLocation: {
+        $near: {
+          $geometry: {
+            type: 'Point',
+            coordinates: [lng, lat]
+          },
+          $maxDistance: radiusInMeters
+        }
+      }
+    })
+    .populate('userId', 'phoneNumber profile')
+    .select('userId vehicleDetails currentLocation rating isOnline')
+    .limit(20)
+    .lean();
+
+    nearbyDrivers = drivers.map(driver => ({
+      id: driver._id,
+      location: {
+        latitude: driver.currentLocation.coordinates[1],
+        longitude: driver.currentLocation.coordinates[0],
+        address: driver.currentLocation.address
+      },
+      vehicleType: driver.vehicleDetails?.vehicleType,
+      vehicleNumber: driver.vehicleDetails?.vehicleNumber,
+      rating: driver.rating?.average || 0,
+      totalRatings: driver.rating?.totalRatings || 0,
+      distance: null
+    }));
+  }
+
+  res.status(200).json({
+    success: true,
+    data: {
+      drivers: nearbyDrivers,
+      total: nearbyDrivers.length,
+      source // 'redis' or 'mongodb' - useful for debugging
+    }
+  });
+});
+
+// Calculate price estimate
+exports.getPriceEstimate = asyncHandler(async (req, res) => {
+  const { pickupLat, pickupLng, dropoffLat, dropoffLng, vehicleType } = req.query;
+
+  if (!pickupLat || !pickupLng || !dropoffLat || !dropoffLng || !vehicleType) {
+    throw new ValidationError('All location and vehicle type parameters are required');
+  }
+
+  // Get pricing config for vehicle type
+  const pricing = await PricingConfig.findOne({ vehicleType, isActive: true });
+  if (!pricing) {
+    throw new NotFoundError('Pricing not available for this vehicle type');
+  }
+
+  // Calculate distance using Google Maps
+  const distanceData = await mapsService.calculateDistance(
+    { lat: parseFloat(pickupLat), lng: parseFloat(pickupLng) },
+    { lat: parseFloat(dropoffLat), lng: parseFloat(dropoffLng) }
+  );
+
+  const distanceInKm = distanceData.distance / 1000;
+
+  // Calculate pricing
+  const distancePrice = distanceInKm * pricing.perKmRate;
+  const serviceFee = (pricing.basePrice + distancePrice) * (pricing.serviceFeePercentage / 100);
+  const totalAmount = pricing.basePrice + distancePrice + serviceFee;
+
+  // Ensure minimum fare
+  const finalAmount = Math.max(totalAmount, pricing.minimumFare);
+
+  res.status(200).json({
+    success: true,
+    data: {
+      vehicleType,
+      distance: distanceInKm,
+      estimatedDuration: Math.round(distanceData.duration / 60), // in minutes
+      pricing: {
+        basePrice: pricing.basePrice,
+        perKmRate: pricing.perKmRate,
+        distancePrice: Math.round(distancePrice * 100) / 100,
+        serviceFee: Math.round(serviceFee * 100) / 100,
+        totalAmount: Math.round(finalAmount * 100) / 100,
+        currency: 'QAR'
+      }
+    }
+  });
+});
+
+// Create booking request
+exports.createBooking = asyncHandler(async (req, res) => {
+  const {
+    pickupLocation,
+    dropoffLocation,
+    vehicleType,
+    notes
+  } = req.body;
+
+  // Validate required fields
+  if (!pickupLocation?.coordinates || !dropoffLocation?.coordinates || !vehicleType) {
+    throw new ValidationError('Pickup location, dropoff location, and vehicle type are required');
+  }
+
+  // Get pricing config
+  const pricing = await PricingConfig.findOne({ vehicleType, isActive: true });
+  if (!pricing) {
+    throw new NotFoundError('Pricing not available for this vehicle type');
+  }
+
+  // Calculate distance
+  const distanceData = await mapsService.calculateDistance(
+    { lat: pickupLocation.coordinates[1], lng: pickupLocation.coordinates[0] },
+    { lat: dropoffLocation.coordinates[1], lng: dropoffLocation.coordinates[0] }
+  );
+
+  const distanceInKm = distanceData.distance / 1000;
+  const distancePrice = distanceInKm * pricing.perKmRate;
+  const serviceFee = (pricing.basePrice + distancePrice) * (pricing.serviceFeePercentage / 100);
+  const totalAmount = Math.max(pricing.basePrice + distancePrice + serviceFee, pricing.minimumFare);
+
+  // Generate booking number
+  const bookingNumber = `BK${Date.now()}${Math.floor(Math.random() * 1000)}`;
+
+  // Set expiry times
+  const requestExpiresAt = new Date(Date.now() + BOOKING_REQUEST_TIMEOUT_SECONDS * 1000);
+
+  // Create booking
+  const booking = await Booking.create({
+    bookingNumber,
+    userId: req.userId,
+    vehicleType,
+    pickupLocation: {
+      type: 'Point',
+      coordinates: pickupLocation.coordinates,
+      address: pickupLocation.address,
+      placeName: pickupLocation.placeName
+    },
+    dropoffLocation: {
+      type: 'Point',
+      coordinates: dropoffLocation.coordinates,
+      address: dropoffLocation.address,
+      placeName: dropoffLocation.placeName
+    },
+    distance: {
+      estimated: distanceInKm
+    },
+    pricing: {
+      basePrice: pricing.basePrice,
+      perKmRate: pricing.perKmRate,
+      totalDistance: distanceInKm,
+      distancePrice: Math.round(distancePrice * 100) / 100,
+      serviceFee: Math.round(serviceFee * 100) / 100,
+      totalAmount: Math.round(totalAmount * 100) / 100,
+      currency: 'QAR'
+    },
+    status: BOOKING_STATUS.REQUESTED,
+    requestExpiresAt,
+    searchRadius: 10,
+    notes
+  });
+
+  // Populate user details
+  await booking.populate('userId', 'phoneNumber profile');
+
+  res.status(201).json({
+    success: true,
+    message: 'Booking request created successfully',
+    data: {
+      booking: {
+        id: booking._id,
+        bookingNumber: booking.bookingNumber,
+        status: booking.status,
+        vehicleType: booking.vehicleType,
+        pickupLocation: booking.pickupLocation,
+        dropoffLocation: booking.dropoffLocation,
+        pricing: booking.pricing,
+        expiresAt: booking.requestExpiresAt,
+        createdAt: booking.createdAt
+      }
+    }
+  });
+});
+
+// Get user's active booking
+exports.getUserActiveBooking = asyncHandler(async (req, res) => {
+  const booking = await Booking.findOne({
+    userId: req.userId,
+    status: {
+      $in: [
+        BOOKING_STATUS.REQUESTED,
+        BOOKING_STATUS.ACCEPTED,
+        BOOKING_STATUS.DRIVER_ARRIVED,
+        BOOKING_STATUS.IN_PROGRESS,
+        BOOKING_STATUS.PAYMENT_COMPLETED
+      ]
+    }
+  })
+  .populate('userId', 'phoneNumber profile')
+  .populate({
+    path: 'driverId',
+    populate: { path: 'userId', select: 'phoneNumber profile' }
+  })
+  .sort({ createdAt: -1 });
+
+  res.status(200).json({
+    success: true,
+    data: {
+      booking: booking || null
+    }
+  });
+});
+
+// Cancel booking by user
+exports.cancelBooking = asyncHandler(async (req, res) => {
+  const { bookingId } = req.params;
+  const { reason } = req.body;
+
+  const booking = await Booking.findOne({
+    _id: bookingId,
+    userId: req.userId
+  });
+
+  if (!booking) {
+    throw new NotFoundError('Booking not found');
+  }
+
+  // Check if booking can be cancelled
+  if ([BOOKING_STATUS.COMPLETED, BOOKING_STATUS.CANCELLED_BY_USER, BOOKING_STATUS.CANCELLED_BY_DRIVER].includes(booking.status)) {
+    throw new ValidationError('Booking cannot be cancelled');
+  }
+
+  booking.status = BOOKING_STATUS.CANCELLED_BY_USER;
+  booking.cancellationDetails = {
+    cancelledBy: 'user',
+    reason: reason || 'No reason provided',
+    cancelledAt: new Date()
+  };
+  booking.timeline.cancelledAt = new Date();
+  await booking.save();
+
+  res.status(200).json({
+    success: true,
+    message: 'Booking cancelled successfully',
+    data: { booking }
+  });
+});
+
+// Get user's booking history
+exports.getUserBookingHistory = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 10, status } = req.query;
+
+  const query = { userId: req.userId };
+  if (status) {
+    query.status = status;
+  }
+
+  const bookings = await Booking.find(query)
+    .populate('driverId', 'userId vehicleDetails rating')
+    .sort({ createdAt: -1 })
+    .limit(parseInt(limit))
+    .skip((parseInt(page) - 1) * parseInt(limit));
+
+  const total = await Booking.countDocuments(query);
+
+  res.status(200).json({
+    success: true,
+    data: {
+      bookings,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    }
+  });
+});
+
+/**
+ * DRIVER BOOKING APIS
+ */
+
+// Get available booking requests for driver
+exports.getAvailableBookings = asyncHandler(async (req, res) => {
+  // Get driver profile
+  const driver = await Driver.findOne({ userId: req.userId });
+  if (!driver) {
+    throw new NotFoundError('Driver profile not found');
+  }
+
+  // Check if driver is approved and online
+  if (driver.approvalStatus !== 'approved' || !driver.isOnline) {
+    return res.status(200).json({
+      success: true,
+      data: { bookings: [] }
+    });
+  }
+
+  const driverLocation = driver.currentLocation.coordinates;
+  const searchRadius = 10000; // 10 km in meters
+
+  // Find nearby booking requests
+  const bookings = await Booking.find({
+    status: BOOKING_STATUS.REQUESTED,
+    vehicleType: driver.vehicleDetails.vehicleType,
+    requestExpiresAt: { $gt: new Date() },
+    'pickupLocation.coordinates': {
+      $near: {
+        $geometry: {
+          type: 'Point',
+          coordinates: driverLocation
+        },
+        $maxDistance: searchRadius
+      }
+    }
+  })
+  .populate('userId', 'phoneNumber profile')
+  .sort({ createdAt: -1 })
+  .limit(10);
+
+  res.status(200).json({
+    success: true,
+    data: { bookings }
+  });
+});
+
+// Accept booking request
+exports.acceptBooking = asyncHandler(async (req, res) => {
+  const { bookingId } = req.params;
+
+  // Get driver profile
+  const driver = await Driver.findOne({ userId: req.userId });
+  if (!driver) {
+    throw new NotFoundError('Driver profile not found');
+  }
+
+  // Find booking
+  const booking = await Booking.findById(bookingId);
+  if (!booking) {
+    throw new NotFoundError('Booking not found');
+  }
+
+  // Check if booking is still available
+  if (booking.status !== BOOKING_STATUS.REQUESTED) {
+    throw new ValidationError('Booking is no longer available');
+  }
+
+  if (booking.isExpired()) {
+    throw new ValidationError('Booking request has expired');
+  }
+
+  // Accept booking
+  booking.status = BOOKING_STATUS.ACCEPTED;
+  booking.driverId = driver._id;
+  booking.timeline.acceptedAt = new Date();
+
+  // Set payment expiry
+  booking.paymentExpiresAt = new Date(Date.now() + PAYMENT_TIMEOUT_SECONDS * 1000);
+
+  await booking.save();
+
+  await booking.populate('userId', 'phoneNumber profile');
+
+  res.status(200).json({
+    success: true,
+    message: 'Booking accepted successfully',
+    data: { booking }
+  });
+});
+
+// Get driver's active booking
+exports.getDriverActiveBooking = asyncHandler(async (req, res) => {
+  const driver = await Driver.findOne({ userId: req.userId });
+  if (!driver) {
+    throw new NotFoundError('Driver profile not found');
+  }
+
+  const booking = await Booking.findOne({
+    driverId: driver._id,
+    status: {
+      $in: [
+        BOOKING_STATUS.ACCEPTED,
+        BOOKING_STATUS.DRIVER_ARRIVED,
+        BOOKING_STATUS.IN_PROGRESS,
+        BOOKING_STATUS.PAYMENT_COMPLETED
+      ]
+    }
+  })
+  .populate('userId', 'phoneNumber profile')
+  .sort({ createdAt: -1 });
+
+  res.status(200).json({
+    success: true,
+    data: {
+      booking: booking || null
+    }
+  });
+});
+
+// Mark driver arrived at pickup
+exports.markDriverArrived = asyncHandler(async (req, res) => {
+  const { bookingId } = req.params;
+
+  const driver = await Driver.findOne({ userId: req.userId });
+  const booking = await Booking.findOne({
+    _id: bookingId,
+    driverId: driver._id
+  });
+
+  if (!booking) {
+    throw new NotFoundError('Booking not found');
+  }
+
+  if (booking.status !== BOOKING_STATUS.PAYMENT_COMPLETED) {
+    throw new ValidationError('Payment must be completed before marking arrival');
+  }
+
+  booking.status = BOOKING_STATUS.DRIVER_ARRIVED;
+  booking.timeline.driverArrivedAt = new Date();
+  await booking.save();
+
+  res.status(200).json({
+    success: true,
+    message: 'Arrival confirmed',
+    data: { booking }
+  });
+});
+
+// Start trip
+exports.startTrip = asyncHandler(async (req, res) => {
+  const { bookingId } = req.params;
+
+  const driver = await Driver.findOne({ userId: req.userId });
+  const booking = await Booking.findOne({
+    _id: bookingId,
+    driverId: driver._id
+  });
+
+  if (!booking) {
+    throw new NotFoundError('Booking not found');
+  }
+
+  if (booking.status !== BOOKING_STATUS.DRIVER_ARRIVED) {
+    throw new ValidationError('Driver must be marked as arrived before starting trip');
+  }
+
+  booking.status = BOOKING_STATUS.IN_PROGRESS;
+  booking.timeline.startedAt = new Date();
+  await booking.save();
+
+  res.status(200).json({
+    success: true,
+    message: 'Trip started',
+    data: { booking }
+  });
+});
+
+// Complete trip
+exports.completeTrip = asyncHandler(async (req, res) => {
+  const { bookingId } = req.params;
+  const { actualDropoffLocation } = req.body;
+
+  const driver = await Driver.findOne({ userId: req.userId });
+  const booking = await Booking.findOne({
+    _id: bookingId,
+    driverId: driver._id
+  });
+
+  if (!booking) {
+    throw new NotFoundError('Booking not found');
+  }
+
+  if (booking.status !== BOOKING_STATUS.IN_PROGRESS) {
+    throw new ValidationError('Trip must be in progress to complete');
+  }
+
+  // Update actual dropoff location if provided
+  if (actualDropoffLocation?.coordinates) {
+    booking.actualDropoffLocation = {
+      type: 'Point',
+      coordinates: actualDropoffLocation.coordinates,
+      address: actualDropoffLocation.address
+    };
+
+    // Calculate actual distance
+    const actualDistanceData = await mapsService.calculateDistance(
+      { lat: booking.pickupLocation.coordinates[1], lng: booking.pickupLocation.coordinates[0] },
+      { lat: actualDropoffLocation.coordinates[1], lng: actualDropoffLocation.coordinates[0] }
+    );
+    booking.distance.actual = actualDistanceData.distance / 1000;
+  }
+
+  // Calculate driver earnings and platform commission
+  const pricing = await PricingConfig.findOne({ vehicleType: booking.vehicleType });
+  const commissionPercentage = pricing?.driverCommissionPercentage || 20;
+
+  booking.platformCommission = (booking.pricing.totalAmount * commissionPercentage) / 100;
+  booking.driverEarnings = booking.pricing.totalAmount - booking.platformCommission;
+
+  booking.status = BOOKING_STATUS.COMPLETED;
+  booking.timeline.completedAt = new Date();
+  await booking.save();
+
+  // Update driver earnings
+  driver.earnings.totalEarnings += booking.driverEarnings;
+  driver.earnings.availableBalance += booking.driverEarnings;
+  await driver.save();
+
+  res.status(200).json({
+    success: true,
+    message: 'Trip completed successfully',
+    data: {
+      booking,
+      earnings: booking.driverEarnings
+    }
+  });
+});
+
+// Cancel booking by driver
+exports.cancelBookingByDriver = asyncHandler(async (req, res) => {
+  const { bookingId } = req.params;
+  const { reason } = req.body;
+
+  const driver = await Driver.findOne({ userId: req.userId });
+  const booking = await Booking.findOne({
+    _id: bookingId,
+    driverId: driver._id
+  });
+
+  if (!booking) {
+    throw new NotFoundError('Booking not found');
+  }
+
+  if ([BOOKING_STATUS.COMPLETED, BOOKING_STATUS.CANCELLED_BY_USER, BOOKING_STATUS.CANCELLED_BY_DRIVER].includes(booking.status)) {
+    throw new ValidationError('Booking cannot be cancelled');
+  }
+
+  booking.status = BOOKING_STATUS.CANCELLED_BY_DRIVER;
+  booking.cancellationDetails = {
+    cancelledBy: 'driver',
+    reason: reason || 'No reason provided',
+    cancelledAt: new Date()
+  };
+  booking.timeline.cancelledAt = new Date();
+  await booking.save();
+
+  res.status(200).json({
+    success: true,
+    message: 'Booking cancelled successfully',
+    data: { booking }
+  });
+});
+
+// Get driver's booking history
+exports.getDriverBookingHistory = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 10, status } = req.query;
+
+  const driver = await Driver.findOne({ userId: req.userId });
+  if (!driver) {
+    throw new NotFoundError('Driver profile not found');
+  }
+
+  const query = { driverId: driver._id };
+  if (status) {
+    query.status = status;
+  }
+
+  const bookings = await Booking.find(query)
+    .populate('userId', 'phoneNumber profile')
+    .sort({ createdAt: -1 })
+    .limit(parseInt(limit))
+    .skip((parseInt(page) - 1) * parseInt(limit));
+
+  const total = await Booking.countDocuments(query);
+
+  res.status(200).json({
+    success: true,
+    data: {
+      bookings,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    }
+  });
+});
+
+// Request specific driver for tow service
+exports.requestSpecificDriver = asyncHandler(async (req, res) => {
+  const {
+    driverId,
+    vehicleType,
+    pickupLocation,
+    dropoffLocation,
+    vehicleDetails,
+    notes
+  } = req.body;
+
+  // Validate required fields
+  if (!driverId || !pickupLocation?.coordinates || !dropoffLocation?.coordinates) {
+    throw new ValidationError('Driver ID, pickup location, and dropoff location are required');
+  }
+
+  // Find and validate driver
+  const driver = await Driver.findById(driverId);
+  if (!driver) {
+    throw new NotFoundError('Driver not found');
+  }
+
+  // Check if driver has current location
+  if (!driver.currentLocation?.coordinates) {
+    throw new ValidationError('Driver location is not available');
+  }
+
+  // Calculate driver to pickup distance and ETA using Google Maps
+  const driverToPickup = await mapsService.calculateDriverToPickupDistance(
+    driver.currentLocation,
+    { type: 'Point', coordinates: pickupLocation.coordinates }
+  );
+
+  // Calculate trip route (pickup to dropoff)
+  const tripRoute = await mapsService.calculateTripRoute(
+    { type: 'Point', coordinates: pickupLocation.coordinates },
+    { type: 'Point', coordinates: dropoffLocation.coordinates }
+  );
+
+  // Static pricing as requested
+  const totalAmount = 110;
+
+  // Generate booking number
+  const bookingNumber = `BK${Date.now()}${Math.floor(Math.random() * 1000)}`;
+
+  // Set expiry times
+  const requestExpiresAt = new Date(Date.now() + BOOKING_REQUEST_TIMEOUT_SECONDS * 1000);
+
+  // Create booking
+  const booking = await Booking.create({
+    bookingNumber,
+    userId: req.userId,
+    driverId: driver._id,
+    vehicleType,
+    pickupLocation: {
+      type: 'Point',
+      coordinates: pickupLocation.coordinates,
+      address: pickupLocation.address,
+      placeName: pickupLocation.placeName
+    },
+    dropoffLocation: {
+      type: 'Point',
+      coordinates: dropoffLocation.coordinates,
+      address: dropoffLocation.address,
+      placeName: dropoffLocation.placeName
+    },
+    vehicleDetails,
+    distance: {
+      estimated: tripRoute.distance,
+      driverToPickup: driverToPickup.distance
+    },
+    pricing: {
+      basePrice: totalAmount,
+      perKmRate: 0,
+      totalDistance: tripRoute.distance,
+      distancePrice: 0,
+      serviceFee: 0,
+      totalAmount: totalAmount,
+      currency: 'USD'
+    },
+    estimatedDuration: {
+      driverToPickup: driverToPickup.duration,
+      trip: tripRoute.duration
+    },
+    status: BOOKING_STATUS.REQUESTED,
+    requestExpiresAt,
+    notes
+  });
+
+  // Populate user and driver details
+  await booking.populate([
+    { path: 'userId', select: 'phoneNumber profile' },
+    { path: 'driverId', populate: { path: 'userId', select: 'phoneNumber profile' } }
+  ]);
+
+  // Send notification to driver via Firebase
+  await notificationService.notifyDriverNewBooking(
+    driver._id,
+    booking._id,
+    pickupLocation.address,
+    {
+      eta: driverToPickup.duration,
+      pricing: totalAmount,
+      bookingNumber: booking.bookingNumber
+    }
+  );
+
+  res.status(201).json({
+    success: true,
+    message: 'Booking request sent to driver successfully',
+    data: {
+      booking: {
+        id: booking._id,
+        bookingNumber: booking.bookingNumber,
+        status: booking.status,
+        vehicleType: booking.vehicleType,
+        pickupLocation: booking.pickupLocation,
+        dropoffLocation: booking.dropoffLocation,
+        pricing: booking.pricing,
+        driverInfo: {
+          id: driver._id,
+          name: driver.userId.profile?.firstName + ' ' + driver.userId.profile?.lastName,
+          phoneNumber: driver.userId.phoneNumber,
+          vehicleNumber: driver.vehicleDetails?.vehicleNumber,
+          rating: driver.rating?.average || 0
+        },
+        estimatedDuration: {
+          driverArrival: `${driverToPickup.duration} min (${driverToPickup.distanceText})`,
+          tripDuration: `${tripRoute.duration} min (${tripRoute.distanceText})`
+        },
+        expiresAt: booking.requestExpiresAt,
+        createdAt: booking.createdAt
+      }
+    }
+  });
+});

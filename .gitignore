@@ -7,3 +7,6 @@ coverage/
 .vscode/
 .idea/
 dist/
+*firebase-adminsdk*.json
+test-request-driver.json
+"C\357\200\272UsersUserDesktopresq-backendsrccontrollersauth.controller.js"

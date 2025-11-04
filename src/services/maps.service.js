@@ -163,6 +163,64 @@ class MapsService {
       throw new Error(`Failed to get place details: ${error.message}`);
     }
   }
+
+  /**
+   * Calculate distance and time between driver location and pickup using Distance Matrix API
+   */
+  async calculateDriverToPickupDistance(driverLocation, pickupLocation) {
+    try {
+      const result = await googleMaps.calculateDistance(
+        { latitude: driverLocation.coordinates[1], longitude: driverLocation.coordinates[0] },
+        { latitude: pickupLocation.coordinates[1], longitude: pickupLocation.coordinates[0] }
+      );
+
+      if (result.status === 'OK' && result.rows.length > 0) {
+        const element = result.rows[0].elements[0];
+
+        if (element.status === 'OK') {
+          return {
+            distance: element.distance.value / 1000, // km
+            distanceText: element.distance.text,
+            duration: Math.ceil(element.duration.value / 60), // minutes
+            durationText: element.duration.text
+          };
+        }
+      }
+
+      throw new Error('Could not calculate distance');
+    } catch (error) {
+      throw new Error(`Driver to pickup distance calculation failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Calculate route details between pickup and dropoff using Directions API
+   */
+  async calculateTripRoute(pickupLocation, dropoffLocation) {
+    try {
+      const result = await googleMaps.getDirections(
+        { latitude: pickupLocation.coordinates[1], longitude: pickupLocation.coordinates[0] },
+        { latitude: dropoffLocation.coordinates[1], longitude: dropoffLocation.coordinates[0] }
+      );
+
+      if (result.status === 'OK' && result.routes.length > 0) {
+        const route = result.routes[0];
+        const leg = route.legs[0];
+
+        return {
+          distance: leg.distance.value / 1000, // km
+          distanceText: leg.distance.text,
+          duration: Math.ceil(leg.duration.value / 60), // minutes
+          durationText: leg.duration.text,
+          polyline: route.overview_polyline.points
+        };
+      }
+
+      throw new Error('Could not calculate route');
+    } catch (error) {
+      throw new Error(`Trip route calculation failed: ${error.message}`);
+    }
+  }
 }
 
 module.exports = new MapsService();

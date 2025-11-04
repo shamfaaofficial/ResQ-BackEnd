@@ -33,9 +33,16 @@ class OTPService {
    * Verify OTP
    */
   async verifyOTP(phoneNumber, otpCode, purpose) {
+    console.log('🔐 [OTPService] verifyOTP called');
+    console.log('🔐 [OTPService] phoneNumber:', phoneNumber);
+    console.log('🔐 [OTPService] otpCode:', otpCode);
+    console.log('🔐 [OTPService] purpose:', purpose);
+
     const hashedOTP = hashOTP(otpCode);
+    console.log('🔐 [OTPService] hashedOTP:', hashedOTP);
 
     // Find OTP
+    console.log('🔍 [OTPService] Searching for OTP in database...');
     const otp = await OTP.findOne({
       phoneNumber,
       purpose,
@@ -43,26 +50,53 @@ class OTPService {
       isVerified: false
     });
 
+    console.log('🔍 [OTPService] OTP found:', otp ? 'Yes' : 'No');
+    if (otp) {
+      console.log('🔍 [OTPService] OTP details:', {
+        id: otp._id,
+        phoneNumber: otp.phoneNumber,
+        purpose: otp.purpose,
+        attempts: otp.attempts,
+        expiresAt: otp.expiresAt,
+        isExpired: otp.isExpired()
+      });
+    }
+
     if (!otp) {
+      console.log('❌ [OTPService] No matching OTP found in database');
+      // Let's also check if there's any OTP for this phone number
+      const anyOTP = await OTP.findOne({ phoneNumber, purpose });
+      console.log('🔍 [OTPService] Any OTP for this phone number:', anyOTP ? 'Yes' : 'No');
+      if (anyOTP) {
+        console.log('🔍 [OTPService] Existing OTP:', {
+          storedHash: anyOTP.otp,
+          providedHash: hashedOTP,
+          match: anyOTP.otp === hashedOTP
+        });
+      }
       throw new BadRequestError('Invalid OTP');
     }
 
     // Check if expired
     if (otp.isExpired()) {
+      console.log('❌ [OTPService] OTP has expired');
       await OTP.deleteOne({ _id: otp._id });
       throw new BadRequestError('OTP has expired');
     }
 
     // Check attempts
     if (otp.attempts >= 3) {
+      console.log('❌ [OTPService] Maximum attempts exceeded');
       await OTP.deleteOne({ _id: otp._id });
       throw new BadRequestError('Maximum OTP attempts exceeded');
     }
 
     // Mark as verified
+    console.log('✅ [OTPService] OTP is valid, marking as verified');
     otp.isVerified = true;
     await otp.save();
 
+    console.log('✅ [OTPService] OTP verified successfully');
     return true;
   }
 
