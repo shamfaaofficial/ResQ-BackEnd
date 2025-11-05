@@ -161,6 +161,31 @@ class OTPService {
   }
 
   /**
+   * Check if OTP is already verified
+   */
+  async isOTPVerified(phoneNumber, otpCode, purpose) {
+    const hashedOTP = hashOTP(otpCode);
+
+    const otp = await OTP.findOne({
+      phoneNumber,
+      purpose,
+      otp: hashedOTP,
+      isVerified: true
+    });
+
+    if (!otp) {
+      return false;
+    }
+
+    // Check if expired
+    if (otp.isExpired()) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
    * Delete OTP after successful verification
    */
   async deleteOTP(phoneNumber, purpose) {

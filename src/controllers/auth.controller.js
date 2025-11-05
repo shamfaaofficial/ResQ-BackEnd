@@ -783,11 +783,14 @@ exports.forgotPasswordRequest = asyncHandler(async (req, res) => {
 
 // Verify OTP for password reset
 exports.forgotPasswordVerifyOTP = asyncHandler(async (req, res) => {
-  const { phoneNumber, otp } = req.body;
+  let { phoneNumber, otp } = req.body;
 
   if (!phoneNumber || !otp) {
     throw new ValidationError('Phone number and OTP are required');
   }
+
+  // Clean phone number
+  phoneNumber = cleanPhoneNumber(phoneNumber);
 
   // Verify OTP
   await otpService.verifyOTP(phoneNumber, otp, OTP_PURPOSE.PASSWORD_RESET);
@@ -804,11 +807,14 @@ exports.forgotPasswordVerifyOTP = asyncHandler(async (req, res) => {
 
 // Reset password
 exports.forgotPasswordReset = asyncHandler(async (req, res) => {
-  const { phoneNumber, otp, newPassword, role } = req.body;
+  let { phoneNumber, otp, newPassword, role } = req.body;
 
   if (!phoneNumber || !otp || !newPassword || !role) {
     throw new ValidationError('Phone number, OTP, new password, and role are required');
   }
+
+  // Clean phone number
+  phoneNumber = cleanPhoneNumber(phoneNumber);
 
   if (!['user', 'driver'].includes(role)) {
     throw new ValidationError('Role must be either "user" or "driver"');
@@ -820,9 +826,11 @@ exports.forgotPasswordReset = asyncHandler(async (req, res) => {
     throw new ValidationError('Password must be at least 8 characters with uppercase, lowercase, number and special character');
   }
 
-  // Verify OTP one more time
+  // Check if OTP was verified (either still unverified or already verified)
   const otpValid = await otpService.validateOTP(phoneNumber, otp, OTP_PURPOSE.PASSWORD_RESET);
-  if (!otpValid) {
+  const otpVerified = await otpService.isOTPVerified(phoneNumber, otp, OTP_PURPOSE.PASSWORD_RESET);
+
+  if (!otpValid && !otpVerified) {
     throw new ValidationError('Invalid or expired OTP');
   }
 
