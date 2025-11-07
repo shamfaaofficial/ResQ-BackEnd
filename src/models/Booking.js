@@ -113,16 +113,26 @@ const bookingSchema = new mongoose.Schema({
     }
   },
   payment: {
-    paymentId: String,
-    paymentMethod: String,
-    paymentStatus: {
+    status: {
       type: String,
       enum: Object.values(PAYMENT_STATUS),
       default: PAYMENT_STATUS.PENDING
     },
-    paidAt: Date,
+    method: String,
+    gateway: {
+      type: String,
+      default: 'MyFatoorah'
+    },
+    invoiceId: String,
     transactionId: String,
-    invoiceId: String
+    paidAmount: Number,
+    paidAt: Date,
+    initiatedAt: Date,
+    failedAt: Date,
+    gatewayResponse: mongoose.Schema.Types.Mixed,
+    refundStatus: String,
+    refundAmount: Number,
+    refundDate: Date
   },
   timeline: {
     requestedAt: {
@@ -130,6 +140,7 @@ const bookingSchema = new mongoose.Schema({
       default: Date.now
     },
     acceptedAt: Date,
+    paymentCompletedAt: Date,
     driverArrivedAt: Date,
     startedAt: Date,
     completedAt: Date,
@@ -167,6 +178,34 @@ const bookingSchema = new mongoose.Schema({
   notes: {
     type: String,
     maxlength: 500
+  },
+  verificationCode: {
+    code: {
+      type: String,
+      length: 4
+    },
+    generatedAt: Date,
+    verifiedAt: Date,
+    isVerified: {
+      type: Boolean,
+      default: false
+    }
+  },
+  arrivalVerification: {
+    driverLocation: {
+      type: {
+        type: String,
+        enum: ['Point'],
+        default: 'Point'
+      },
+      coordinates: [Number] // [lng, lat]
+    },
+    distanceFromPickup: Number, // meters
+    verifiedAt: Date,
+    isVerified: {
+      type: Boolean,
+      default: false
+    }
   }
 }, {
   timestamps: true

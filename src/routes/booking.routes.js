@@ -39,6 +39,14 @@ router.get(
   bookingController.getUserActiveBooking
 );
 
+// Get calculated price for booking after driver arrives (protected - user only)
+router.get(
+  '/user/:bookingId/price',
+  authMiddleware,
+  roleMiddleware('user'),
+  bookingController.getBookingPrice
+);
+
 // Cancel booking (protected - user only)
 router.patch(
   '/user/:bookingId/cancel',

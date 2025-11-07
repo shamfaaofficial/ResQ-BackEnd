@@ -119,16 +119,10 @@ exports.getNearbyDrivers = asyncHandler(async (req, res) => {
 
 // Calculate price estimate
 exports.getPriceEstimate = asyncHandler(async (req, res) => {
-  const { pickupLat, pickupLng, dropoffLat, dropoffLng, vehicleType } = req.query;
+  const { pickupLat, pickupLng, dropoffLat, dropoffLng } = req.query;
 
-  if (!pickupLat || !pickupLng || !dropoffLat || !dropoffLng || !vehicleType) {
-    throw new ValidationError('All location and vehicle type parameters are required');
-  }
-
-  // Get pricing config for vehicle type
-  const pricing = await PricingConfig.findOne({ vehicleType, isActive: true });
-  if (!pricing) {
-    throw new NotFoundError('Pricing not available for this vehicle type');
+  if (!pickupLat || !pickupLng || !dropoffLat || !dropoffLng) {
+    throw new ValidationError('Pickup and dropoff locations are required');
   }
 
   // Calculate distance using Google Maps
@@ -139,27 +133,29 @@ exports.getPriceEstimate = asyncHandler(async (req, res) => {
 
   const distanceInKm = distanceData.distance / 1000;
 
-  // Calculate pricing
-  const distancePrice = distanceInKm * pricing.perKmRate;
-  const serviceFee = (pricing.basePrice + distancePrice) * (pricing.serviceFeePercentage / 100);
-  const totalAmount = pricing.basePrice + distancePrice + serviceFee;
-
-  // Ensure minimum fare
-  const finalAmount = Math.max(totalAmount, pricing.minimumFare);
+  // Static pricing: 110 QAR base + 10 QAR per km
+  const basePrice = 110;
+  const perKmRate = 10;
+  const distancePrice = distanceInKm * perKmRate;
+  const totalAmount = basePrice + distancePrice;
 
   res.status(200).json({
     success: true,
+    message: 'Price calculated successfully',
     data: {
-      vehicleType,
-      distance: distanceInKm,
+      distance: Math.round(distanceInKm * 10) / 10,
       estimatedDuration: Math.round(distanceData.duration / 60), // in minutes
       pricing: {
-        basePrice: pricing.basePrice,
-        perKmRate: pricing.perKmRate,
+        basePrice: basePrice,
+        perKmRate: perKmRate,
         distancePrice: Math.round(distancePrice * 100) / 100,
-        serviceFee: Math.round(serviceFee * 100) / 100,
-        totalAmount: Math.round(finalAmount * 100) / 100,
-        currency: 'QAR'
+        totalAmount: Math.round(totalAmount * 100) / 100,
+        currency: 'QAR',
+        breakdown: {
+          base: `${basePrice} QAR (fixed)`,
+          distance: `${Math.round(distanceInKm * 10) / 10} km × ${perKmRate} QAR/km = ${Math.round(distancePrice * 100) / 100} QAR`,
+          total: `${Math.round(totalAmount * 100) / 100} QAR`
+        }
       }
     }
   });
@@ -179,12 +175,6 @@ exports.createBooking = asyncHandler(async (req, res) => {
     throw new ValidationError('Pickup location, dropoff location, and vehicle type are required');
   }
 
-  // Get pricing config
-  const pricing = await PricingConfig.findOne({ vehicleType, isActive: true });
-  if (!pricing) {
-    throw new NotFoundError('Pricing not available for this vehicle type');
-  }
-
   // Calculate distance
   const distanceData = await mapsService.calculateDistance(
     { lat: pickupLocation.coordinates[1], lng: pickupLocation.coordinates[0] },
@@ -192,9 +182,12 @@ exports.createBooking = asyncHandler(async (req, res) => {
   );
 
   const distanceInKm = distanceData.distance / 1000;
-  const distancePrice = distanceInKm * pricing.perKmRate;
-  const serviceFee = (pricing.basePrice + distancePrice) * (pricing.serviceFeePercentage / 100);
-  const totalAmount = Math.max(pricing.basePrice + distancePrice + serviceFee, pricing.minimumFare);
+
+  // Static pricing: 110 QAR base + 10 QAR per km
+  const basePrice = 110;
+  const perKmRate = 10;
+  const distancePrice = distanceInKm * perKmRate;
+  const totalAmount = basePrice + distancePrice;
 
   // Generate booking number
   const bookingNumber = `BK${Date.now()}${Math.floor(Math.random() * 1000)}`;
@@ -223,11 +216,11 @@ exports.createBooking = asyncHandler(async (req, res) => {
       estimated: distanceInKm
     },
     pricing: {
-      basePrice: pricing.basePrice,
-      perKmRate: pricing.perKmRate,
+      basePrice: basePrice,
+      perKmRate: perKmRate,
       totalDistance: distanceInKm,
       distancePrice: Math.round(distancePrice * 100) / 100,
-      serviceFee: Math.round(serviceFee * 100) / 100,
+      serviceFee: 0,
       totalAmount: Math.round(totalAmount * 100) / 100,
       currency: 'QAR'
     },
@@ -284,6 +277,46 @@ exports.getUserActiveBooking = asyncHandler(async (req, res) => {
     success: true,
     data: {
       booking: booking || null
+    }
+  });
+});
+
+// Get calculated price for booking (after driver arrives)
+exports.getBookingPrice = asyncHandler(async (req, res) => {
+  const { bookingId } = req.params;
+
+  const booking = await Booking.findOne({
+    _id: bookingId,
+    userId: req.userId
+  });
+
+  if (!booking) {
+    throw new NotFoundError('Booking not found');
+  }
+
+  // Only show calculated price if driver has arrived
+  if (booking.status !== BOOKING_STATUS.DRIVER_ARRIVED && booking.status !== BOOKING_STATUS.PAYMENT_COMPLETED && booking.status !== BOOKING_STATUS.IN_PROGRESS && booking.status !== BOOKING_STATUS.COMPLETED) {
+    throw new ValidationError('Price not yet calculated. Driver must arrive first.');
+  }
+
+  res.status(200).json({
+    success: true,
+    data: {
+      bookingId: booking._id,
+      bookingNumber: booking.bookingNumber,
+      status: booking.status,
+      pricing: {
+        basePrice: booking.pricing.basePrice,
+        perKmRate: booking.pricing.perKmRate,
+        actualDistance: Math.round(booking.distance.actual * 10) / 10,
+        distancePrice: booking.pricing.distancePrice,
+        totalAmount: booking.pricing.totalAmount,
+        currency: booking.pricing.currency
+      },
+      paymentExpiresAt: booking.paymentExpiresAt,
+      timeline: {
+        arrivedAt: booking.timeline.driverArrivedAt
+      }
     }
   });
 });
@@ -432,7 +465,7 @@ exports.acceptBooking = asyncHandler(async (req, res) => {
   booking.driverId = driver._id;
   booking.timeline.acceptedAt = new Date();
 
-  // Set payment expiry
+  // Set payment expiry after acceptance (user should pay within 5 minutes)
   booking.paymentExpiresAt = new Date(Date.now() + PAYMENT_TIMEOUT_SECONDS * 1000);
 
   await booking.save();
@@ -510,17 +543,41 @@ exports.markDriverArrived = asyncHandler(async (req, res) => {
   }
 
   if (booking.status !== BOOKING_STATUS.PAYMENT_COMPLETED) {
-    throw new ValidationError('Payment must be completed before marking arrival');
+    throw new ValidationError('Payment must be completed before driver can mark arrival');
   }
+
+  // Generate 4-digit verification code
+  const verificationCode = Math.floor(1000 + Math.random() * 9000).toString();
+
+  booking.verificationCode = {
+    code: verificationCode,
+    generatedAt: new Date(),
+    isVerified: false
+  };
 
   booking.status = BOOKING_STATUS.DRIVER_ARRIVED;
   booking.timeline.driverArrivedAt = new Date();
   await booking.save();
 
+  // Populate booking for response
+  await booking.populate('userId', 'phoneNumber profile fcmToken');
+
+  // Send notification to user with verification code
+  await notificationService.sendNotification(
+    booking.userId._id,
+    'Driver Arrived',
+    `Your driver has arrived! Your verification code is: ${verificationCode}`,
+    'driver_arrived',
+    { bookingId: booking._id, verificationCode }
+  );
+
   res.status(200).json({
     success: true,
-    message: 'Arrival confirmed',
-    data: { booking }
+    message: 'Arrival confirmed. Verification code generated.',
+    data: {
+      booking,
+      verificationCode: verificationCode
+    }
   });
 });
 
@@ -539,7 +596,12 @@ exports.startTrip = asyncHandler(async (req, res) => {
   }
 
   if (booking.status !== BOOKING_STATUS.DRIVER_ARRIVED) {
-    throw new ValidationError('Driver must be marked as arrived before starting trip');
+    throw new ValidationError('Driver must arrive at pickup before starting trip');
+  }
+
+  // Check if verification code is verified
+  if (!booking.verificationCode?.isVerified) {
+    throw new ValidationError('You must verify the pickup code before starting trip');
   }
 
   booking.status = BOOKING_STATUS.IN_PROGRESS;
@@ -727,8 +789,11 @@ exports.requestSpecificDriver = asyncHandler(async (req, res) => {
     { type: 'Point', coordinates: dropoffLocation.coordinates }
   );
 
-  // Static pricing as requested
-  const totalAmount = 110;
+  // Calculate pricing: 110 QAR base + 10 QAR per km
+  const basePrice = 110;
+  const perKmRate = 10;
+  const distancePrice = tripRoute.distance * perKmRate;
+  const totalAmount = basePrice + distancePrice;
 
   // Generate booking number
   const bookingNumber = `BK${Date.now()}${Math.floor(Math.random() * 1000)}`;
@@ -760,13 +825,13 @@ exports.requestSpecificDriver = asyncHandler(async (req, res) => {
       driverToPickup: driverToPickup.distance
     },
     pricing: {
-      basePrice: totalAmount,
-      perKmRate: 0,
+      basePrice: basePrice,
+      perKmRate: perKmRate,
       totalDistance: tripRoute.distance,
-      distancePrice: 0,
+      distancePrice: Math.round(distancePrice * 100) / 100,
       serviceFee: 0,
-      totalAmount: totalAmount,
-      currency: 'USD'
+      totalAmount: Math.round(totalAmount * 100) / 100,
+      currency: 'QAR'
     },
     estimatedDuration: {
       driverToPickup: driverToPickup.duration,

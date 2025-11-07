@@ -14,6 +14,8 @@ const driverRoutes = require('./routes/driver.routes');
 const adminRoutes = require('./routes/admin.routes');
 const utilsRoutes = require('./routes/utils.routes');
 const bookingRoutes = require('./routes/booking.routes');
+const paymentRoutes = require('./routes/payment.routes');
+const tripRoutes = require('./routes/trip.routes');
 
 // Initialize Express app
 const app = express();
@@ -56,6 +58,8 @@ app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/user', userRoutes);
 app.use('/api/v1/driver', driverRoutes);
 app.use('/api/v1/bookings', bookingRoutes);
+app.use('/api/v1/payment', paymentRoutes);
+app.use('/api/v1/trip', tripRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/utils',  utilsRoutes);
 
