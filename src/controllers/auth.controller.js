@@ -837,7 +837,7 @@ exports.forgotPasswordReset = asyncHandler(async (req, res) => {
   // Find user/driver
   let user;
   if (role === 'driver') {
-    user = await Driver.findOne({ phoneNumber });
+    user = await User.findOne({ phoneNumber, role: 'driver' });
   } else {
     user = await User.findOne({ phoneNumber, role: 'user' });
   }
