@@ -162,6 +162,8 @@ const driverSchema = new mongoose.Schema({
 driverSchema.index({ currentLocation: '2dsphere' });
 driverSchema.index({ userId: 1 });
 driverSchema.index({ approvalStatus: 1, isOnline: 1 });
+// Compound index for nearby driver queries (online + location)
+driverSchema.index({ isOnline: 1, currentLocation: '2dsphere' });
 
 // Method to update location
 driverSchema.methods.updateLocation = function(longitude, latitude, address) {

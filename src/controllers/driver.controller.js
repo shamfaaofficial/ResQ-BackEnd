@@ -48,24 +48,16 @@ exports.updateLocation = asyncHandler(async (req, res) => {
     });
   }
 
-  // MONGODB LAYER: Update only every 5 minutes (reduces DB load)
-  const shouldSync = await redisService.shouldSyncToMongoDB(driver._id);
-
-  if (shouldSync || !isRedisAvailable()) {
-    // Update driver's current location in MongoDB
-    driver.currentLocation = {
-      type: 'Point',
-      coordinates: [lng, lat],
-      address: address || driver.currentLocation.address,
-      lastUpdated: new Date()
-    };
-    driver.isLocationEnabled = true;
-    await driver.save();
-  } else if (!driver.isLocationEnabled) {
-    // Even if we skip full sync, ensure isLocationEnabled is set on first location update
-    driver.isLocationEnabled = true;
-    await driver.save();
-  }
+  // MONGODB LAYER: Always update location in MongoDB for geospatial queries
+  // (Redis is used for real-time tracking, MongoDB for driver discovery)
+  driver.currentLocation = {
+    type: 'Point',
+    coordinates: [lng, lat],
+    address: address || driver.currentLocation.address,
+    lastUpdated: new Date()
+  };
+  driver.isLocationEnabled = true;
+  await driver.save();
 
   // Check if driver has active booking
   let activeBooking = null;
