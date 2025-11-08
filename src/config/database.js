@@ -6,6 +6,11 @@ const connectDatabase = async () => {
 
     console.log(`MongoDB Connected: ${conn.connection.host}`);
 
+    // Auto-sync indexes on startup (ensures geospatial indexes exist)
+    console.log('🔄 Syncing database indexes...');
+    await mongoose.connection.syncIndexes();
+    console.log('✅ Database indexes synced');
+
     mongoose.connection.on('error', (err) => {
       console.error(`MongoDB connection error: ${err}`);
     });
