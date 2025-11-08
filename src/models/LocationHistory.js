@@ -4,14 +4,12 @@ const locationHistorySchema = new mongoose.Schema({
   bookingId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Booking',
-    required: true,
-    index: true
+    required: true
   },
   driverId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Driver',
-    required: true,
-    index: true
+    required: true
   },
   location: {
     type: {

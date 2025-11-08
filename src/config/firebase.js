@@ -10,9 +10,15 @@ class FirebaseConfig {
 
   initialize() {
     try {
-      // Get service account path from environment or use default
-      const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH ||
-        './src/config/resq-7cd08-firebase-adminsdk-fbsvc-78361eb6c6.json';
+      // Skip Firebase initialization if no service account path configured
+      if (!process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
+        console.warn('⚠️  Firebase not configured - Push notifications disabled');
+        this.initialized = false;
+        return;
+      }
+
+      // Get service account path from environment
+      const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
 
       // Resolve the absolute path
       const absolutePath = path.isAbsolute(serviceAccountPath)

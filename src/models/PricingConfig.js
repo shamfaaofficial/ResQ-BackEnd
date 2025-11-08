@@ -43,7 +43,7 @@ const pricingConfigSchema = new mongoose.Schema({
   timestamps: true
 });
 
-pricingConfigSchema.index({ vehicleType: 1 });
+// vehicleType already has unique index from schema definition
 pricingConfigSchema.index({ isActive: 1 });
 
 module.exports = mongoose.model('PricingConfig', pricingConfigSchema);

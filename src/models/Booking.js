@@ -5,26 +5,22 @@ const bookingSchema = new mongoose.Schema({
   bookingNumber: {
     type: String,
     required: true,
-    unique: true,
-    index: true
+    unique: true
   },
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
-    index: true
+    required: true
   },
   driverId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Driver',
-    default: null,
-    index: true
+    default: null
   },
   status: {
     type: String,
     enum: Object.values(BOOKING_STATUS),
-    default: BOOKING_STATUS.REQUESTED,
-    index: true
+    default: BOOKING_STATUS.REQUESTED
   },
   vehicleType: {
     type: String,
@@ -148,12 +144,10 @@ const bookingSchema = new mongoose.Schema({
   },
   requestExpiresAt: {
     type: Date,
-    required: true,
-    index: true
+    required: true
   },
   paymentExpiresAt: {
-    type: Date,
-    index: true
+    type: Date
   },
   cancellationDetails: {
     cancelledBy: {
@@ -212,7 +206,7 @@ const bookingSchema = new mongoose.Schema({
 });
 
 // Indexes for efficient queries
-bookingSchema.index({ bookingNumber: 1 });
+// bookingNumber already has unique index from schema definition
 bookingSchema.index({ userId: 1, status: 1 });
 bookingSchema.index({ driverId: 1, status: 1 });
 bookingSchema.index({ status: 1, createdAt: -1 });

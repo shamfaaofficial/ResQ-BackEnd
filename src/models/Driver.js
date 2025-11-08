@@ -160,7 +160,7 @@ const driverSchema = new mongoose.Schema({
 
 // Create 2dsphere index for geospatial queries
 driverSchema.index({ currentLocation: '2dsphere' });
-driverSchema.index({ userId: 1 });
+// userId already has unique index from schema definition
 driverSchema.index({ approvalStatus: 1, isOnline: 1 });
 // Compound index for nearby driver queries (online + location)
 driverSchema.index({ isOnline: 1, currentLocation: '2dsphere' });

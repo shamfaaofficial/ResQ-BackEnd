@@ -4,8 +4,7 @@ const { OTP_PURPOSE } = require('../config/constants');
 const otpSchema = new mongoose.Schema({
   phoneNumber: {
     type: String,
-    required: true,
-    index: true
+    required: true
   },
   otp: {
     type: String,
@@ -27,8 +26,7 @@ const otpSchema = new mongoose.Schema({
   },
   expiresAt: {
     type: Date,
-    required: true,
-    index: true
+    required: true
   },
   createdAt: {
     type: Date,

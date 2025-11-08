@@ -6,7 +6,6 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
     unique: true,
-    index: true,
     trim: true
   },
   countryCode: {
@@ -18,7 +17,6 @@ const userSchema = new mongoose.Schema({
     required: false,
     unique: true,
     sparse: true,
-    index: true,
     trim: true,
     lowercase: true
   },
@@ -82,7 +80,7 @@ const userSchema = new mongoose.Schema({
 
 // Index for better query performance
 userSchema.index({ phoneNumber: 1, role: 1 });
-userSchema.index({ username: 1 });
+// username already has unique index from schema definition
 
 // Method to clean expired refresh tokens
 userSchema.methods.cleanExpiredTokens = function() {

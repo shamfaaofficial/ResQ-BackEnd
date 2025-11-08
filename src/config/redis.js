@@ -7,9 +7,15 @@ let redisClient = null;
  */
 const connectRedis = async () => {
   try {
+    // Skip Redis if not configured
+    if (!process.env.REDIS_URL) {
+      console.warn('⚠️  [Redis] Not configured - Running without Redis cache');
+      return null;
+    }
+
     // Create Redis client
     redisClient = redis.createClient({
-      url: process.env.REDIS_URL || 'redis://redis:6379',
+      url: process.env.REDIS_URL,
       socket: {
         reconnectStrategy: (retries) => {
           if (retries > 10) {
