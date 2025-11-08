@@ -47,7 +47,7 @@ app.use('/api', generalLimiter);
 app.get('/health', (req, res) => {
   res.status(200).json({
     success: true,
-    message: 'RESQ Backend API is running',
+    message: 'RESQ Backend API is running perfeclty',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV
   });
