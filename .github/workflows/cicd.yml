@@ -39,7 +39,7 @@ jobs:
           timeout: 30s
           script: |
             set -euo pipefail
-            cd /home/ubuntu/docker/resq/app/code
+            cd /home/ubuntu/docker/resq/app/
 
             echo 'Starting containers'
             docker compose up -d --build
