@@ -756,7 +756,7 @@ exports.forgotPasswordRequest = asyncHandler(async (req, res) => {
   // Check if user/driver exists
   let userExists;
   if (role === 'driver') {
-    userExists = await Driver.findOne({ phoneNumber });
+    userExists = await User.findOne({ phoneNumber, role: 'driver' });
   } else {
     userExists = await User.findOne({ phoneNumber, role: 'user' });
   }

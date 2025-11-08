@@ -2,7 +2,12 @@
   "permissions": {
     "allow": [
       "Bash(npm install:*)",
-      "Bash(curl -X POST http://localhost:5000/api/v1/auth/driver/signup -H \"Content-Type: application/json\" -d \"{\"\"phoneNumber\"\": \"\"+919961052060\"\"}\")"
+      "Bash(curl -X POST http://localhost:5000/api/v1/auth/driver/signup -H \"Content-Type: application/json\" -d \"{\"\"phoneNumber\"\": \"\"+919961052060\"\"}\")",
+      "Bash(docker ps:*)",
+      "Bash(docker:*)",
+      "Bash(node:*)",
+      "Bash(curl:*)",
+      "Bash(pm2 restart:*)"
     ],
     "deny": [],
     "ask": []

@@ -21,8 +21,8 @@ class MyFatoorahPaymentService {
    */
   async initiatePayment(booking, user) {
     try {
-      const callbackUrl = `${process.env.APP_BASE_URL || 'http://localhost:5000'}/api/v1/payment/callback`;
-      const errorUrl = `${process.env.APP_BASE_URL || 'http://localhost:5000'}/api/v1/payment/error`;
+      const callbackUrl = `${process.env.APP_BASE_URL || 'https://dev.resq-qa.com'}/api/v1/payment/callback`;
+      const errorUrl = `${process.env.APP_BASE_URL || 'https://dev.resq-qa.com'}/api/v1/payment/error`;
 
       const payload = {
         NotificationOption: 'LNK',

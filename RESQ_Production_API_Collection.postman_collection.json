@@ -1,0 +1,953 @@
+{
+  "info": {
+    "name": "RESQ Production API - Complete Collection",
+    "description": "Complete API collection for RESQ Tow Car Service Platform - Production (https://dev.resq-qa.com)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "resq-production"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://dev.resq-qa.com",
+      "type": "string"
+    },
+    {
+      "key": "phoneNumber",
+      "value": "+97431234567",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "bookingId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "User Auth",
+      "item": [
+        {
+          "name": "1. User Signup - Send OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"{{phoneNumber}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/user/signup",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "user", "signup"]
+            },
+            "description": "Step 1: Send OTP to user's phone number for signup"
+          }
+        },
+        {
+          "name": "2. User Verify OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"{{phoneNumber}}\",\n  \"otp\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/user/verify-otp",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "user", "verify-otp"]
+            },
+            "description": "Step 2: Verify OTP code"
+          }
+        },
+        {
+          "name": "3. User Complete Signup",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"{{phoneNumber}}\",\n  \"username\": \"john_doe\",\n  \"password\": \"Password@123\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"email\": \"john@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/user/complete-signup",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "user", "complete-signup"]
+            },
+            "description": "Step 3: Complete user registration"
+          }
+        },
+        {
+          "name": "User Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"john_doe\",\n  \"password\": \"Password@123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/user/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "user", "login"]
+            },
+            "description": "Login with username and password"
+          }
+        },
+        {
+          "name": "User Forgot Password - Send OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"{{phoneNumber}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/user/forgot-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "user", "forgot-password"]
+            },
+            "description": "Send OTP for password reset"
+          }
+        },
+        {
+          "name": "User Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"{{phoneNumber}}\",\n  \"otp\": \"123456\",\n  \"newPassword\": \"NewPassword@123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/user/reset-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "user", "reset-password"]
+            },
+            "description": "Reset password with OTP"
+          }
+        },
+        {
+          "name": "User Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/user/refresh-token",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "user", "refresh-token"]
+            },
+            "description": "Refresh access token"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Driver Auth",
+      "item": [
+        {
+          "name": "1. Driver Signup - Send OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"{{phoneNumber}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/driver/signup",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "driver", "signup"]
+            },
+            "description": "Step 1: Send OTP to driver's phone"
+          }
+        },
+        {
+          "name": "2. Driver Verify OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"{{phoneNumber}}\",\n  \"otp\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/driver/verify-otp",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "driver", "verify-otp"]
+            },
+            "description": "Step 2: Verify OTP"
+          }
+        },
+        {
+          "name": "3. Driver Complete Signup",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"{{phoneNumber}}\",\n  \"username\": \"driver_mike\",\n  \"password\": \"Password@123\",\n  \"firstName\": \"Mike\",\n  \"lastName\": \"Smith\",\n  \"email\": \"mike@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/driver/complete-signup",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "driver", "complete-signup"]
+            },
+            "description": "Step 3: Complete driver registration"
+          }
+        },
+        {
+          "name": "4. Driver Submit Documents",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "vehicleType",
+                  "value": "sedan",
+                  "type": "text"
+                },
+                {
+                  "key": "vehicleNumber",
+                  "value": "ABC-1234",
+                  "type": "text"
+                },
+                {
+                  "key": "vehicleMake",
+                  "value": "Toyota",
+                  "type": "text"
+                },
+                {
+                  "key": "vehicleModel",
+                  "value": "Camry",
+                  "type": "text"
+                },
+                {
+                  "key": "vehicleYear",
+                  "value": "2022",
+                  "type": "text"
+                },
+                {
+                  "key": "vehicleColor",
+                  "value": "White",
+                  "type": "text"
+                },
+                {
+                  "key": "drivingLicense",
+                  "type": "file",
+                  "src": ""
+                },
+                {
+                  "key": "vehicleRegistration",
+                  "type": "file",
+                  "src": ""
+                },
+                {
+                  "key": "insurance",
+                  "type": "file",
+                  "src": ""
+                },
+                {
+                  "key": "nationalId",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/driver/submit-documents",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "driver", "submit-documents"]
+            },
+            "description": "Step 4: Upload driver documents"
+          }
+        },
+        {
+          "name": "Driver Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"driver_mike\",\n  \"password\": \"Password@123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/driver/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "driver", "login"]
+            },
+            "description": "Driver login"
+          }
+        },
+        {
+          "name": "Driver Forgot Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"{{phoneNumber}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/driver/forgot-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "driver", "forgot-password"]
+            }
+          }
+        },
+        {
+          "name": "Driver Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"{{phoneNumber}}\",\n  \"otp\": \"123456\",\n  \"newPassword\": \"NewPassword@123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/driver/reset-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "driver", "reset-password"]
+            }
+          }
+        },
+        {
+          "name": "Driver Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/driver/refresh-token",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "driver", "refresh-token"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin Auth",
+      "item": [
+        {
+          "name": "Admin Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"Admin@12345\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/admin/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "admin", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "User - Bookings",
+      "item": [
+        {
+          "name": "Get User Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/user/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "user", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Update User Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"email\": \"john.doe@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/user/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "user", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Create Booking Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vehicleType\": \"sedan\",\n  \"pickupLocation\": {\n    \"address\": \"Doha Airport\",\n    \"coordinates\": [51.5310, 25.2854]\n  },\n  \"dropoffLocation\": {\n    \"address\": \"Souq Waqif\",\n    \"coordinates\": [51.5347, 25.2867]\n  },\n  \"description\": \"Car breakdown, need towing\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/user/booking/request",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "user", "booking", "request"]
+            }
+          }
+        },
+        {
+          "name": "Get Nearby Drivers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/user/nearby-drivers?latitude=25.2854&longitude=51.5310&radius=10&vehicleType=sedan",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "user", "nearby-drivers"],
+              "query": [
+                {
+                  "key": "latitude",
+                  "value": "25.2854"
+                },
+                {
+                  "key": "longitude",
+                  "value": "51.5310"
+                },
+                {
+                  "key": "radius",
+                  "value": "10"
+                },
+                {
+                  "key": "vehicleType",
+                  "value": "sedan"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get My Bookings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/user/booking/my-bookings",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "user", "booking", "my-bookings"]
+            }
+          }
+        },
+        {
+          "name": "Get Booking Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/user/booking/{{bookingId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "user", "booking", "{{bookingId}}"]
+            }
+          }
+        },
+        {
+          "name": "Cancel Booking",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Changed my mind\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/user/booking/{{bookingId}}/cancel",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "user", "booking", "{{bookingId}}", "cancel"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Driver - Bookings",
+      "item": [
+        {
+          "name": "Get Driver Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/driver/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "driver", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Update Driver Location",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": 25.2854,\n  \"longitude\": 51.5310\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/driver/location",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "driver", "location"]
+            }
+          }
+        },
+        {
+          "name": "Toggle Driver Online Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isOnline\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/driver/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "driver", "status"]
+            }
+          }
+        },
+        {
+          "name": "Get Available Bookings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/driver/booking/available",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "driver", "booking", "available"]
+            }
+          }
+        },
+        {
+          "name": "Accept Booking",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/driver/booking/{{bookingId}}/accept",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "driver", "booking", "{{bookingId}}", "accept"]
+            }
+          }
+        },
+        {
+          "name": "Mark Arrived",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/driver/booking/{{bookingId}}/arrived",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "driver", "booking", "{{bookingId}}", "arrived"]
+            }
+          }
+        },
+        {
+          "name": "Start Trip",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/driver/booking/{{bookingId}}/start",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "driver", "booking", "{{bookingId}}", "start"]
+            }
+          }
+        },
+        {
+          "name": "Complete Trip",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/driver/booking/{{bookingId}}/complete",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "driver", "booking", "{{bookingId}}", "complete"]
+            }
+          }
+        },
+        {
+          "name": "Get Driver Earnings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/driver/earnings",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "driver", "earnings"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Get Dashboard Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/dashboard/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "dashboard", "stats"]
+            }
+          }
+        },
+        {
+          "name": "Get Pending Drivers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/drivers/pending",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "drivers", "pending"]
+            }
+          }
+        },
+        {
+          "name": "Approve Driver",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/drivers/:driverId/approve",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "drivers", ":driverId", "approve"],
+              "variable": [
+                {
+                  "key": "driverId",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Reject Driver",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Invalid documents\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/drivers/:driverId/reject",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "drivers", ":driverId", "reject"],
+              "variable": [
+                {
+                  "key": "driverId",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get All Bookings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/bookings",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "bookings"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Utilities",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            }
+          }
+        },
+        {
+          "name": "Get Pricing Config",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pricing?vehicleType=sedan",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "pricing"],
+              "query": [
+                {
+                  "key": "vehicleType",
+                  "value": "sedan"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "logout"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
