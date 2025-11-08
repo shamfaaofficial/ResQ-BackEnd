@@ -12,7 +12,7 @@ class FirebaseConfig {
     try {
       // Get service account path from environment or use default
       const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH ||
-        './resq-7cd08-firebase-adminsdk-fbsvc-78361eb6c6.json';
+        './src/config/resq-7cd08-firebase-adminsdk-fbsvc-78361eb6c6.json';
 
       // Resolve the absolute path
       const absolutePath = path.isAbsolute(serviceAccountPath)
