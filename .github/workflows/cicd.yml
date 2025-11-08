@@ -15,6 +15,20 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Remove unnecessary files
+        run: |
+          rm -rf node_modules .git
+
+      - name: Copy code to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          source: "./*"
+          target: "/home/ubuntu/docker/resq/app/code"
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v0.1.7
         with:
@@ -26,9 +40,6 @@ jobs:
           script: |
             set -euo pipefail
             cd /home/ubuntu/docker/resq/app/code
-
-            echo 'Updating repo'
-            git pull origin/main
 
             echo 'Starting containers'
             docker compose up -d --build
