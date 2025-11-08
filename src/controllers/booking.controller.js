@@ -31,80 +31,96 @@ exports.getNearbyDrivers = asyncHandler(async (req, res) => {
 
   // TRY REDIS FIRST (100x faster)
   if (isRedisAvailable()) {
-    const redisResults = await redisService.findNearbyDrivers(lng, lat, radiusKm, 20);
+    try {
+      const redisResults = await redisService.findNearbyDrivers(lng, lat, radiusKm, 20);
 
-    if (redisResults && redisResults.length > 0) {
-      // Get driver details from MongoDB for the nearby driver IDs
-      const driverIds = redisResults.map(r => r.driverId);
+      if (redisResults && redisResults.length > 0) {
+        // Get driver details from MongoDB for the nearby driver IDs
+        const driverIds = redisResults.map(r => r.driverId);
 
-      const drivers = await Driver.find({
-        _id: { $in: driverIds },
-        isOnline: true
-        // Note: Removed approvalStatus check temporarily as per earlier request
-      })
-      .populate('userId', 'phoneNumber profile')
-      .select('userId vehicleDetails currentLocation rating isOnline')
-      .lean();
+        const drivers = await Driver.find({
+          _id: { $in: driverIds },
+          isOnline: true
+          // Note: Removed approvalStatus check temporarily as per earlier request
+        })
+        .populate('userId', 'phoneNumber profile')
+        .select('userId vehicleDetails currentLocation rating isOnline')
+        .lean();
 
-      // Map drivers with distance from Redis
-      nearbyDrivers = drivers.map(driver => {
-        const redisData = redisResults.find(r => r.driverId === driver._id.toString());
-        return {
-          id: driver._id,
-          location: {
-            latitude: driver.currentLocation.coordinates[1],
-            longitude: driver.currentLocation.coordinates[0],
-            address: driver.currentLocation.address
-          },
-          vehicleType: driver.vehicleDetails?.vehicleType,
-          vehicleNumber: driver.vehicleDetails?.vehicleNumber,
-          rating: driver.rating?.average || 0,
-          totalRatings: driver.rating?.totalRatings || 0,
-          distance: redisData ? redisData.distance : null
-        };
-      });
+        // Map drivers with distance from Redis
+        nearbyDrivers = drivers.map(driver => {
+          const redisData = redisResults.find(r => r.driverId === driver._id.toString());
+          return {
+            id: driver._id,
+            location: {
+              latitude: driver.currentLocation.coordinates[1],
+              longitude: driver.currentLocation.coordinates[0],
+              address: driver.currentLocation.address
+            },
+            vehicleType: driver.vehicleDetails?.vehicleType,
+            vehicleNumber: driver.vehicleDetails?.vehicleNumber,
+            rating: driver.rating?.average || 0,
+            totalRatings: driver.rating?.totalRatings || 0,
+            distance: redisData ? redisData.distance : null
+          };
+        });
 
-      // Sort by distance (closest first)
-      nearbyDrivers.sort((a, b) => a.distance - b.distance);
-      source = 'redis';
+        // Sort by distance (closest first)
+        nearbyDrivers.sort((a, b) => a.distance - b.distance);
+        source = 'redis';
+      }
+    } catch (redisError) {
+      console.error('[Booking] Redis query failed, falling back to MongoDB:', redisError.message);
+      // Continue to MongoDB fallback
     }
   }
 
   // FALLBACK TO MONGODB if Redis unavailable or no results
   if (nearbyDrivers.length === 0) {
-    const radiusInMeters = radiusKm * 1000;
+    try {
+      const radiusInMeters = radiusKm * 1000;
 
-    const drivers = await Driver.find({
-      isOnline: true,
-      // approvalStatus: 'approved', // Commented out as per earlier request
-      currentLocation: {
-        $near: {
-          $geometry: {
-            type: 'Point',
-            coordinates: [lng, lat]
-          },
-          $maxDistance: radiusInMeters
+      console.log(`[Booking] Querying MongoDB for drivers near [${lng}, ${lat}] within ${radiusKm}km`);
+
+      const drivers = await Driver.find({
+        isOnline: true,
+        isLocationEnabled: true,
+        // approvalStatus: 'approved', // Commented out as per earlier request
+        currentLocation: {
+          $near: {
+            $geometry: {
+              type: 'Point',
+              coordinates: [lng, lat]
+            },
+            $maxDistance: radiusInMeters
+          }
         }
-      }
-    })
-    .populate('userId', 'phoneNumber profile')
-    .select('userId vehicleDetails currentLocation rating isOnline')
-    .limit(20)
-    .lean();
+      })
+      .populate('userId', 'phoneNumber profile')
+      .select('userId vehicleDetails currentLocation rating isOnline')
+      .limit(20)
+      .lean();
 
-    nearbyDrivers = drivers.map(driver => ({
-      id: driver._id,
-      location: {
-        latitude: driver.currentLocation.coordinates[1],
-        longitude: driver.currentLocation.coordinates[0],
-        address: driver.currentLocation.address
-      },
-      vehicleType: driver.vehicleDetails?.vehicleType,
-      vehicleNumber: driver.vehicleDetails?.vehicleNumber,
-      rating: driver.rating?.average || 0,
-      totalRatings: driver.rating?.totalRatings || 0,
-      distance: null
-    }));
+      console.log(`[Booking] Found ${drivers.length} nearby drivers in MongoDB`);
+
+      nearbyDrivers = drivers.map(driver => ({
+        id: driver._id,
+        location: {
+          latitude: driver.currentLocation.coordinates[1],
+          longitude: driver.currentLocation.coordinates[0],
+          address: driver.currentLocation.address
+        },
+        vehicleType: driver.vehicleDetails?.vehicleType,
+        vehicleNumber: driver.vehicleDetails?.vehicleNumber,
+        rating: driver.rating?.average || 0,
+        totalRatings: driver.rating?.totalRatings || 0,
+        distance: null
+      }));
+    } catch (mongoError) {
+      console.error('[Booking] MongoDB geospatial query failed:', mongoError);
+      // Return empty array instead of crashing
+      nearbyDrivers = [];
+    }
   }
 
   res.status(200).json({
