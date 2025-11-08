@@ -61,6 +61,10 @@ exports.updateLocation = asyncHandler(async (req, res) => {
     };
     driver.isLocationEnabled = true;
     await driver.save();
+  } else if (!driver.isLocationEnabled) {
+    // Even if we skip full sync, ensure isLocationEnabled is set on first location update
+    driver.isLocationEnabled = true;
+    await driver.save();
   }
 
   // Check if driver has active booking
