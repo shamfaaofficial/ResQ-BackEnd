@@ -295,7 +295,7 @@ exports.driverSignup = asyncHandler(async (req, res) => {
   }
 
   // Check if driver already exists
-  const existingDriver = await Driver.findOne({ phoneNumber });
+  const existingDriver = await User.findOne({ phoneNumber, role: 'driver' });
   if (existingDriver) {
     throw new ValidationError('Driver with this phone number already exists');
   }
