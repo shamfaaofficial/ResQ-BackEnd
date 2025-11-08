@@ -121,7 +121,7 @@ exports.updateLocation = asyncHandler(async (req, res) => {
 
 // Toggle online status
 exports.toggleOnlineStatus = asyncHandler(async (req, res) => {
-  const { isOnline } = req.body;
+  const { isOnline, latitude, longitude, address } = req.body;
 
   if (typeof isOnline !== 'boolean') {
     throw new ValidationError('isOnline must be a boolean value');
@@ -138,9 +138,34 @@ exports.toggleOnlineStatus = asyncHandler(async (req, res) => {
   //   throw new AuthorizationError('Driver account must be approved to go online');
   // }
 
-  // Check if location is enabled
-  if (isOnline && !driver.isLocationEnabled) {
-    throw new ValidationError('Please enable location to go online');
+  // If going online, check/update location
+  if (isOnline) {
+    // If location provided in request, update it
+    if (latitude && longitude) {
+      const lng = parseFloat(longitude);
+      const lat = parseFloat(latitude);
+
+      driver.currentLocation = {
+        type: 'Point',
+        coordinates: [lng, lat],
+        address: address || driver.currentLocation.address || '',
+        lastUpdated: new Date()
+      };
+      driver.isLocationEnabled = true;
+
+      // Store in Redis if available
+      if (isRedisAvailable()) {
+        await redisService.storeDriverLocation(driver._id, lng, lat, {
+          address: address || driver.currentLocation.address || '',
+          speed: 0,
+          heading: 0,
+          accuracy: 0
+        });
+      }
+    } else if (!driver.isLocationEnabled) {
+      // No location provided and no location enabled
+      throw new ValidationError('Please enable location to go online');
+    }
   }
 
   // Check if vehicle details are provided
@@ -162,7 +187,12 @@ exports.toggleOnlineStatus = asyncHandler(async (req, res) => {
     success: true,
     message: `Driver is now ${isOnline ? 'online' : 'offline'}`,
     data: {
-      isOnline: driver.isOnline
+      isOnline: driver.isOnline,
+      location: isOnline && driver.currentLocation ? {
+        latitude: driver.currentLocation.coordinates[1],
+        longitude: driver.currentLocation.coordinates[0],
+        address: driver.currentLocation.address
+      } : null
     }
   });
 });
