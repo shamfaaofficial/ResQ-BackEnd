@@ -4,9 +4,27 @@ class GoogleMapsService {
   constructor() {
     this.apiKey = process.env.GOOGLE_MAPS_API_KEY;
     this.baseURL = 'https://maps.googleapis.com/maps/api';
+    this.isConfigured = !!this.apiKey;
+
+    if (!this.isConfigured) {
+      console.warn('⚠️  GOOGLE_MAPS_API_KEY not configured. Google Maps services will not be available.');
+      console.warn('⚠️  Distance calculations will fall back to Haversine formula (straight-line distance).');
+    } else {
+      console.log('✅ Google Maps API configured successfully');
+    }
+  }
+
+  /**
+   * Check if Google Maps is properly configured
+   */
+  isAvailable() {
+    return this.isConfigured;
   }
 
   async geocode(address) {
+    if (!this.isConfigured) {
+      throw new Error('Google Maps API key not configured');
+    }
     try {
       const response = await axios.get(`${this.baseURL}/geocode/json`, {
         params: {
@@ -21,6 +39,9 @@ class GoogleMapsService {
   }
 
   async reverseGeocode(latitude, longitude) {
+    if (!this.isConfigured) {
+      throw new Error('Google Maps API key not configured');
+    }
     try {
       const response = await axios.get(`${this.baseURL}/geocode/json`, {
         params: {
@@ -35,6 +56,9 @@ class GoogleMapsService {
   }
 
   async calculateDistance(origin, destination) {
+    if (!this.isConfigured) {
+      throw new Error('Google Maps API key not configured');
+    }
     try {
       const response = await axios.get(`${this.baseURL}/distancematrix/json`, {
         params: {
@@ -50,6 +74,9 @@ class GoogleMapsService {
   }
 
   async getPlaceDetails(placeId) {
+    if (!this.isConfigured) {
+      throw new Error('Google Maps API key not configured');
+    }
     try {
       const response = await axios.get(`${this.baseURL}/place/details/json`, {
         params: {
@@ -64,6 +91,9 @@ class GoogleMapsService {
   }
 
   async getDirections(origin, destination) {
+    if (!this.isConfigured) {
+      throw new Error('Google Maps API key not configured');
+    }
     try {
       const response = await axios.get(`${this.baseURL}/directions/json`, {
         params: {

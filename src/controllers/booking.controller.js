@@ -782,28 +782,53 @@ exports.requestSpecificDriver = asyncHandler(async (req, res) => {
     throw new ValidationError('Driver ID, pickup location, and dropoff location are required');
   }
 
+  // Validate coordinates format
+  if (!Array.isArray(pickupLocation.coordinates) || pickupLocation.coordinates.length !== 2 ||
+      !Array.isArray(dropoffLocation.coordinates) || dropoffLocation.coordinates.length !== 2) {
+    throw new ValidationError('Invalid coordinates format. Expected [longitude, latitude]');
+  }
+
   // Find and validate driver
-  const driver = await Driver.findById(driverId);
+  const driver = await Driver.findById(driverId).populate('userId', 'phoneNumber profile fcmToken');
   if (!driver) {
     throw new NotFoundError('Driver not found');
   }
 
   // Check if driver has current location
-  if (!driver.currentLocation?.coordinates) {
+  if (!driver.currentLocation?.coordinates || !Array.isArray(driver.currentLocation.coordinates)) {
     throw new ValidationError('Driver location is not available');
   }
 
-  // Calculate driver to pickup distance and ETA using Google Maps
-  const driverToPickup = await mapsService.calculateDriverToPickupDistance(
-    driver.currentLocation,
-    { type: 'Point', coordinates: pickupLocation.coordinates }
-  );
+  console.log('[RequestDriver] Calculating distances for booking...');
+  console.log('[RequestDriver] Driver location:', driver.currentLocation.coordinates);
+  console.log('[RequestDriver] Pickup location:', pickupLocation.coordinates);
+  console.log('[RequestDriver] Dropoff location:', dropoffLocation.coordinates);
 
-  // Calculate trip route (pickup to dropoff)
-  const tripRoute = await mapsService.calculateTripRoute(
-    { type: 'Point', coordinates: pickupLocation.coordinates },
-    { type: 'Point', coordinates: dropoffLocation.coordinates }
-  );
+  // Calculate driver to pickup distance and ETA using Google Maps (with fallback)
+  let driverToPickup;
+  try {
+    driverToPickup = await mapsService.calculateDriverToPickupDistance(
+      driver.currentLocation,
+      { type: 'Point', coordinates: pickupLocation.coordinates }
+    );
+    console.log('[RequestDriver] Driver to pickup distance calculated:', driverToPickup);
+  } catch (error) {
+    console.error('[RequestDriver] Failed to calculate driver to pickup distance:', error.message);
+    throw new ValidationError(`Failed to calculate driver distance: ${error.message}`);
+  }
+
+  // Calculate trip route (pickup to dropoff) using Google Maps (with fallback)
+  let tripRoute;
+  try {
+    tripRoute = await mapsService.calculateTripRoute(
+      { type: 'Point', coordinates: pickupLocation.coordinates },
+      { type: 'Point', coordinates: dropoffLocation.coordinates }
+    );
+    console.log('[RequestDriver] Trip route calculated:', tripRoute);
+  } catch (error) {
+    console.error('[RequestDriver] Failed to calculate trip route:', error.message);
+    throw new ValidationError(`Failed to calculate trip route: ${error.message}`);
+  }
 
   // Calculate pricing: 110 QAR base + 10 QAR per km
   const basePrice = 110;
@@ -864,17 +889,36 @@ exports.requestSpecificDriver = asyncHandler(async (req, res) => {
     { path: 'driverId', populate: { path: 'userId', select: 'phoneNumber profile' } }
   ]);
 
-  // Send notification to driver via Firebase
-  await notificationService.notifyDriverNewBooking(
-    driver._id,
-    booking._id,
-    pickupLocation.address,
-    {
-      eta: driverToPickup.duration,
-      pricing: totalAmount,
-      bookingNumber: booking.bookingNumber
-    }
-  );
+  // Send notification to driver via Firebase (non-blocking - don't fail on notification error)
+  try {
+    await notificationService.notifyDriverNewBooking(
+      driver._id,
+      booking._id,
+      pickupLocation.address || 'Pickup location',
+      {
+        eta: driverToPickup.duration,
+        pricing: totalAmount,
+        bookingNumber: booking.bookingNumber
+      }
+    );
+    console.log('[RequestDriver] Notification sent to driver successfully');
+  } catch (notificationError) {
+    console.error('[RequestDriver] Failed to send notification to driver:', notificationError.message);
+    // Don't fail the request if notification fails
+  }
+
+  // Prepare response with driver info
+  const driverName = driver.userId?.profile?.firstName && driver.userId?.profile?.lastName
+    ? `${driver.userId.profile.firstName} ${driver.userId.profile.lastName}`
+    : 'Driver';
+
+  const driverArrivalText = driverToPickup.duration
+    ? `${driverToPickup.duration} min (${driverToPickup.distanceText})`
+    : driverToPickup.distanceText;
+
+  const tripDurationText = tripRoute.duration
+    ? `${tripRoute.duration} min (${tripRoute.distanceText})`
+    : tripRoute.distanceText;
 
   res.status(201).json({
     success: true,
@@ -890,14 +934,14 @@ exports.requestSpecificDriver = asyncHandler(async (req, res) => {
         pricing: booking.pricing,
         driverInfo: {
           id: driver._id,
-          name: driver.userId.profile?.firstName + ' ' + driver.userId.profile?.lastName,
+          name: driverName,
           phoneNumber: driver.userId.phoneNumber,
           vehicleNumber: driver.vehicleDetails?.vehicleNumber,
           rating: driver.rating?.average || 0
         },
         estimatedDuration: {
-          driverArrival: `${driverToPickup.duration} min (${driverToPickup.distanceText})`,
-          tripDuration: `${tripRoute.duration} min (${tripRoute.distanceText})`
+          driverArrival: driverArrivalText,
+          tripDuration: tripDurationText
         },
         expiresAt: booking.requestExpiresAt,
         createdAt: booking.createdAt

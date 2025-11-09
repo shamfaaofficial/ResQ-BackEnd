@@ -43,6 +43,19 @@ class NotificationService {
   }
 
   /**
+   * Generic method to send notification (alias for createNotification with simplified parameters)
+   */
+  async sendNotification(userId, title, message, type, data = {}) {
+    return this.createNotification({
+      userId,
+      type,
+      title,
+      message,
+      data
+    });
+  }
+
+  /**
    * Notify user about booking request
    */
   async notifyBookingRequest(userId, bookingId, bookingNumber) {

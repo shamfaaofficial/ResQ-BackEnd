@@ -1,4 +1,11 @@
 require('dotenv').config();
+
+// Fallback Google Maps API key if not in .env
+if (!process.env.GOOGLE_MAPS_API_KEY) {
+  process.env.GOOGLE_MAPS_API_KEY = 'AIzaSyD2wCBhTvkx8inJorD8K-ZrbtcaYIAQzPU';
+  console.log('✅ Using hardcoded Google Maps API key');
+}
+
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');

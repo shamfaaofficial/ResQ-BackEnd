@@ -48,8 +48,9 @@ class MapsService {
 
   /**
    * Calculate distance between two points using Google Maps API
+   * This is the main method with fallback to Haversine formula
    */
-  async getDistanceBetweenPoints(origin, destination) {
+  async calculateDistance(origin, destination) {
     try {
       const result = await googleMaps.calculateDistance(origin, destination);
 
@@ -58,7 +59,7 @@ class MapsService {
 
         if (element.status === 'OK') {
           return {
-            distance: element.distance.value / 1000, // Convert meters to kilometers
+            distance: element.distance.value, // in meters
             distanceText: element.distance.text,
             duration: element.duration.value, // in seconds
             durationText: element.duration.text
@@ -69,21 +70,29 @@ class MapsService {
       throw new Error('Could not calculate distance');
     } catch (error) {
       // Fallback to Haversine formula if Google Maps fails
-      console.warn('Google Maps distance calculation failed, using Haversine formula');
+      console.warn('Google Maps distance calculation failed, using Haversine formula:', error.message);
       const distance = calculateDistance(
-        origin.latitude,
-        origin.longitude,
-        destination.latitude,
-        destination.longitude
+        origin.latitude || origin.lat,
+        origin.longitude || origin.lng,
+        destination.latitude || destination.lat,
+        destination.longitude || destination.lng
       );
 
       return {
-        distance,
-        distanceText: `${distance} km`,
+        distance: distance * 1000, // convert km to meters for consistency
+        distanceText: `${distance.toFixed(2)} km`,
         duration: null,
         durationText: 'N/A'
       };
     }
+  }
+
+  /**
+   * Calculate distance between two points using Google Maps API
+   * @deprecated Use calculateDistance instead
+   */
+  async getDistanceBetweenPoints(origin, destination) {
+    return this.calculateDistance(origin, destination);
   }
 
   /**
@@ -166,35 +175,44 @@ class MapsService {
 
   /**
    * Calculate distance and time between driver location and pickup using Distance Matrix API
+   * Falls back to Haversine formula if Google Maps API fails
    */
   async calculateDriverToPickupDistance(driverLocation, pickupLocation) {
     try {
-      const result = await googleMaps.calculateDistance(
+      // Use the main calculateDistance method which has fallback
+      const result = await this.calculateDistance(
         { latitude: driverLocation.coordinates[1], longitude: driverLocation.coordinates[0] },
         { latitude: pickupLocation.coordinates[1], longitude: pickupLocation.coordinates[0] }
       );
 
-      if (result.status === 'OK' && result.rows.length > 0) {
-        const element = result.rows[0].elements[0];
-
-        if (element.status === 'OK') {
-          return {
-            distance: element.distance.value / 1000, // km
-            distanceText: element.distance.text,
-            duration: Math.ceil(element.duration.value / 60), // minutes
-            durationText: element.duration.text
-          };
-        }
-      }
-
-      throw new Error('Could not calculate distance');
+      return {
+        distance: result.distance / 1000, // convert meters to km
+        distanceText: result.distanceText,
+        duration: result.duration ? Math.ceil(result.duration / 60) : null, // convert seconds to minutes
+        durationText: result.durationText
+      };
     } catch (error) {
-      throw new Error(`Driver to pickup distance calculation failed: ${error.message}`);
+      // Final fallback - use Haversine directly
+      console.error('All distance calculation methods failed:', error.message);
+      const distance = calculateDistance(
+        driverLocation.coordinates[1],
+        driverLocation.coordinates[0],
+        pickupLocation.coordinates[1],
+        pickupLocation.coordinates[0]
+      );
+
+      return {
+        distance: distance, // already in km
+        distanceText: `${distance.toFixed(2)} km`,
+        duration: null,
+        durationText: 'N/A'
+      };
     }
   }
 
   /**
    * Calculate route details between pickup and dropoff using Directions API
+   * Falls back to Distance Matrix API and then Haversine if Directions API fails
    */
   async calculateTripRoute(pickupLocation, dropoffLocation) {
     try {
@@ -218,7 +236,39 @@ class MapsService {
 
       throw new Error('Could not calculate route');
     } catch (error) {
-      throw new Error(`Trip route calculation failed: ${error.message}`);
+      // Fallback to Distance Matrix API
+      console.warn('Directions API failed, falling back to Distance Matrix:', error.message);
+      try {
+        const result = await this.calculateDistance(
+          { latitude: pickupLocation.coordinates[1], longitude: pickupLocation.coordinates[0] },
+          { latitude: dropoffLocation.coordinates[1], longitude: dropoffLocation.coordinates[0] }
+        );
+
+        return {
+          distance: result.distance / 1000, // convert meters to km
+          distanceText: result.distanceText,
+          duration: result.duration ? Math.ceil(result.duration / 60) : null, // convert seconds to minutes
+          durationText: result.durationText,
+          polyline: null // No polyline available from Distance Matrix
+        };
+      } catch (fallbackError) {
+        // Final fallback - use Haversine directly
+        console.error('All route calculation methods failed:', fallbackError.message);
+        const distance = calculateDistance(
+          pickupLocation.coordinates[1],
+          pickupLocation.coordinates[0],
+          dropoffLocation.coordinates[1],
+          dropoffLocation.coordinates[0]
+        );
+
+        return {
+          distance: distance, // already in km
+          distanceText: `${distance.toFixed(2)} km`,
+          duration: null,
+          durationText: 'N/A',
+          polyline: null
+        };
+      }
     }
   }
 }
