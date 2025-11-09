@@ -189,7 +189,21 @@ class MapsService {
 
       throw new Error('Could not calculate distance');
     } catch (error) {
-      throw new Error(`Driver to pickup distance calculation failed: ${error.message}`);
+      // Fallback to Haversine formula if Google Maps fails
+      console.warn('Google Maps distance calculation failed, using Haversine formula fallback');
+      const distance = calculateDistance(
+        driverLocation.coordinates[1],
+        driverLocation.coordinates[0],
+        pickupLocation.coordinates[1],
+        pickupLocation.coordinates[0]
+      );
+
+      return {
+        distance,
+        distanceText: `${distance.toFixed(2)} km`,
+        duration: Math.ceil(distance * 3), // Rough estimate: 3 minutes per km
+        durationText: `~${Math.ceil(distance * 3)} mins`
+      };
     }
   }
 
