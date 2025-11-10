@@ -83,6 +83,14 @@ router.get(
   bookingController.getAvailableBookings
 );
 
+// Get specific booking details by ID (protected - driver only)
+router.get(
+  '/driver/:bookingId/details',
+  authMiddleware,
+  roleMiddleware('driver'),
+  bookingController.getBookingDetailsById
+);
+
 // Accept booking (protected - driver only)
 router.patch(
   '/driver/:bookingId/accept',

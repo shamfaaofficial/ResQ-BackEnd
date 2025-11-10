@@ -445,9 +445,157 @@ exports.getAvailableBookings = asyncHandler(async (req, res) => {
   .sort({ createdAt: -1 })
   .limit(10);
 
+  // Format bookings with enhanced details
+  const formattedBookings = await Promise.all(bookings.map(async (booking) => {
+    // Calculate driver to pickup distance
+    let driverToPickup = null;
+    if (driver.currentLocation?.coordinates) {
+      try {
+        const distance = await mapsService.calculateDriverToPickupDistance(
+          driver.currentLocation,
+          booking.pickupLocation
+        );
+        driverToPickup = {
+          distance: distance.distance,
+          distanceText: distance.distanceText,
+          duration: distance.duration,
+          durationText: distance.durationText
+        };
+      } catch (error) {
+        console.error('[AvailableBookings] Failed to calculate distance:', error.message);
+      }
+    }
+
+    return {
+      id: booking._id,
+      bookingNumber: booking.bookingNumber,
+      status: booking.status,
+      vehicleType: booking.vehicleType,
+      pickupLocation: booking.pickupLocation,
+      vehicleDetails: booking.vehicleDetails,
+      pricing: booking.pricing,
+      distance: booking.distance,
+      estimatedDuration: booking.estimatedDuration,
+      requestExpiresAt: booking.requestExpiresAt,
+      notes: booking.notes,
+      createdAt: booking.createdAt,
+      user: {
+        id: booking.userId._id,
+        phoneNumber: booking.userId.phoneNumber,
+        name: booking.userId.profile?.firstName
+          ? `${booking.userId.profile.firstName} ${booking.userId.profile.lastName || ''}`.trim()
+          : 'User',
+        profileImage: booking.userId.profile?.profileImage
+      },
+      driverToPickup: driverToPickup,
+      // Time remaining before expiry (in seconds)
+      timeRemaining: Math.max(0, Math.floor((new Date(booking.requestExpiresAt) - new Date()) / 1000))
+    };
+  }));
+
   res.status(200).json({
     success: true,
-    data: { bookings }
+    message: 'Available booking requests fetched successfully',
+    data: {
+      bookings: formattedBookings,
+      total: formattedBookings.length
+    }
+  });
+});
+
+// Get specific booking request details by ID (for driver app)
+exports.getBookingDetailsById = asyncHandler(async (req, res) => {
+  const { bookingId } = req.params;
+
+  // Get driver profile
+  const driver = await Driver.findOne({ userId: req.userId });
+  if (!driver) {
+    throw new NotFoundError('Driver profile not found');
+  }
+
+  // Find the booking
+  const booking = await Booking.findById(bookingId)
+    .populate('userId', 'phoneNumber profile')
+    .populate({
+      path: 'driverId',
+      populate: { path: 'userId', select: 'phoneNumber profile' }
+    });
+
+  if (!booking) {
+    throw new NotFoundError('Booking not found');
+  }
+
+  // Check if this booking is relevant to this driver
+  // Either: assigned to this driver OR it's a requested booking not yet assigned
+  const isAssignedToDriver = booking.driverId && booking.driverId._id.toString() === driver._id.toString();
+  const isOpenRequest = booking.status === BOOKING_STATUS.REQUESTED;
+
+  if (!isAssignedToDriver && !isOpenRequest) {
+    throw new ValidationError('This booking is not available to you');
+  }
+
+  // Prepare booking response
+  const bookingResponse = booking.toObject();
+
+  // Hide dropoff location until trip starts
+  if (booking.status !== BOOKING_STATUS.IN_PROGRESS && booking.status !== BOOKING_STATUS.COMPLETED) {
+    delete bookingResponse.dropoffLocation;
+  }
+
+  // Calculate distance from driver to pickup if booking is still REQUESTED
+  let driverToPickupDistance = null;
+  if (booking.status === BOOKING_STATUS.REQUESTED && driver.currentLocation?.coordinates) {
+    try {
+      const distance = await mapsService.calculateDriverToPickupDistance(
+        driver.currentLocation,
+        booking.pickupLocation
+      );
+      driverToPickupDistance = {
+        distance: distance.distance,
+        distanceText: distance.distanceText,
+        duration: distance.duration,
+        durationText: distance.durationText
+      };
+    } catch (error) {
+      console.error('[GetBookingDetails] Failed to calculate driver distance:', error.message);
+    }
+  }
+
+  res.status(200).json({
+    success: true,
+    message: 'Booking details fetched successfully',
+    data: {
+      booking: {
+        id: booking._id,
+        bookingNumber: booking.bookingNumber,
+        status: booking.status,
+        vehicleType: booking.vehicleType,
+        pickupLocation: booking.pickupLocation,
+        dropoffLocation: bookingResponse.dropoffLocation, // Hidden if not started
+        vehicleDetails: booking.vehicleDetails,
+        pricing: booking.pricing,
+        distance: booking.distance,
+        estimatedDuration: booking.estimatedDuration,
+        timeline: booking.timeline,
+        requestExpiresAt: booking.requestExpiresAt,
+        paymentExpiresAt: booking.paymentExpiresAt,
+        notes: booking.notes,
+        verificationCode: booking.verificationCode,
+        createdAt: booking.createdAt,
+        updatedAt: booking.updatedAt,
+        // User details
+        user: {
+          id: booking.userId._id,
+          phoneNumber: booking.userId.phoneNumber,
+          name: booking.userId.profile?.firstName
+            ? `${booking.userId.profile.firstName} ${booking.userId.profile.lastName || ''}`.trim()
+            : 'User',
+          profileImage: booking.userId.profile?.profileImage
+        },
+        // Driver to pickup info (if applicable)
+        driverToPickup: driverToPickupDistance
+      }
+    }
   });
 });
 

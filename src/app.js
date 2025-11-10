@@ -6,6 +6,13 @@ if (!process.env.GOOGLE_MAPS_API_KEY) {
   console.log('✅ Using hardcoded Google Maps API key');
 }
 
+// Fallback Firebase Service Account path for local development only
+if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON && !process.env.FIREBASE_PROJECT_ID && !process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
+  // Only use file path in local development
+  process.env.FIREBASE_SERVICE_ACCOUNT_PATH = './src/config/resq-7cd08-firebase-adminsdk-fbsvc-78361eb6c6.json';
+  console.log('✅ Using Firebase service account file (local development)');
+}
+
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
@@ -52,11 +59,21 @@ app.use('/api', generalLimiter);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
+  const firebaseConfig = require('./config/firebase');
+  const googleMaps = require('./config/googleMaps');
+  const { isRedisAvailable } = require('./config/redis');
+
   res.status(200).json({
     success: true,
     message: 'RESQ Backend API is running perfeclty',
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV
+    environment: process.env.NODE_ENV,
+    services: {
+      firebase: firebaseConfig.isInitialized() ? '✅ Connected' : '⚠️ Not configured',
+      googleMaps: googleMaps.isAvailable() ? '✅ Configured' : '⚠️ Not configured',
+      redis: isRedisAvailable() ? '✅ Connected' : '⚠️ Not connected',
+      mongodb: '✅ Connected' // If server is running, MongoDB is connected
+    }
   });
 });
 

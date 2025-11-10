@@ -67,8 +67,16 @@ class GoogleMapsService {
           key: this.apiKey
         }
       });
+
+      // Check if Google Maps returned an error
+      if (response.data.status !== 'OK') {
+        throw new Error(`Google Maps API error: ${response.data.status} - ${response.data.error_message || 'Unknown error'}`);
+      }
+
       return response.data;
     } catch (error) {
+      // Log detailed error for debugging
+      console.error('[GoogleMaps] Distance calculation error:', error.response?.data || error.message);
       throw new Error(`Distance calculation failed: ${error.message}`);
     }
   }

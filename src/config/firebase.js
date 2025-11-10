@@ -10,33 +10,68 @@ class FirebaseConfig {
 
   initialize() {
     try {
-      // Skip Firebase initialization if no service account path configured
-      if (!process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
-        console.warn('⚠️  Firebase not configured - Push notifications disabled');
-        this.initialized = false;
+      // Method 1: Try to use service account JSON string from environment variable (RECOMMENDED for production)
+      if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+        console.log('🔥 Initializing Firebase from environment variable...');
+        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+
+        this.admin = admin.initializeApp({
+          credential: admin.credential.cert(serviceAccount),
+          projectId: serviceAccount.project_id
+        });
+
+        this.messaging = admin.messaging();
+        this.initialized = true;
+        console.log('✅ Firebase Admin SDK initialized successfully (from env variable)');
         return;
       }
 
-      // Get service account path from environment
-      const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
+      // Method 2: Try to use individual environment variables
+      if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
+        console.log('🔥 Initializing Firebase from individual env variables...');
 
-      // Resolve the absolute path
-      const absolutePath = path.isAbsolute(serviceAccountPath)
-        ? serviceAccountPath
-        : path.resolve(process.cwd(), serviceAccountPath);
+        this.admin = admin.initializeApp({
+          credential: admin.credential.cert({
+            projectId: process.env.FIREBASE_PROJECT_ID,
+            clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+            privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
+          }),
+          projectId: process.env.FIREBASE_PROJECT_ID
+        });
 
-      const serviceAccount = require(absolutePath);
+        this.messaging = admin.messaging();
+        this.initialized = true;
+        console.log('✅ Firebase Admin SDK initialized successfully (from individual vars)');
+        return;
+      }
 
-      // Initialize Firebase Admin SDK
-      this.admin = admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        projectId: serviceAccount.project_id
-      });
+      // Method 3: Try to load from file path (for local development)
+      if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
+        console.log('🔥 Initializing Firebase from file path...');
+        const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
 
-      this.messaging = admin.messaging();
-      this.initialized = true;
+        // Resolve the absolute path
+        const absolutePath = path.isAbsolute(serviceAccountPath)
+          ? serviceAccountPath
+          : path.resolve(process.cwd(), serviceAccountPath);
 
-      console.log('✅ Firebase Admin SDK initialized successfully');
+        const serviceAccount = require(absolutePath);
+
+        this.admin = admin.initializeApp({
+          credential: admin.credential.cert(serviceAccount),
+          projectId: serviceAccount.project_id
+        });
+
+        this.messaging = admin.messaging();
+        this.initialized = true;
+        console.log('✅ Firebase Admin SDK initialized successfully (from file)');
+        return;
+      }
+
+      // No Firebase configuration found
+      console.warn('⚠️  Firebase not configured - Push notifications disabled');
+      console.warn('⚠️  Set FIREBASE_SERVICE_ACCOUNT_JSON or individual Firebase env vars');
+      this.initialized = false;
     } catch (error) {
       console.error('❌ Firebase initialization failed:', error.message);
       console.warn('⚠️  Push notifications will not be available');
