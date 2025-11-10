@@ -3,7 +3,7 @@ require('dotenv').config();
 // ============================================================================
 // CONFIGURATION VERIFICATION LOGS (for production debugging)
 // ============================================================================
-const CONFIG_VERSION = '2024-11-10-v2.2'; // Update this when making config changes
+const CONFIG_VERSION = '2024-11-10-v3.0-NEW-FIREBASE-CREDS'; // Update this when making config changes
 console.log('\n╔═════════════════════════════════════════════════════════════════╗');
 console.log('║       RESQ Backend - Configuration Initialization              ║');
 console.log('╚═════════════════════════════════════════════════════════════════╝');
@@ -38,9 +38,13 @@ if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON && !process.env.FIREBASE_PROJECT_
     console.log('    ✅ Base64 decode: SUCCESS');
     console.log('    ✅ JSON parse: SUCCESS');
     console.log(`    📋 Project ID: ${serviceAccount.project_id}`);
+    console.log(`    🔑 Private Key ID: ${serviceAccount.private_key_id}`);
     console.log(`    📧 Client Email: ${serviceAccount.client_email}`);
-    console.log(`    🔑 Private Key: ${serviceAccount.private_key ? 'LOADED' : 'MISSING'}`);
-    console.log('    ✅ Firebase credentials ready for initialization');
+    console.log(`    🆔 Client ID: ${serviceAccount.client_id}`);
+    console.log(`    🔑 Private Key: ${serviceAccount.private_key ? 'LOADED (' + serviceAccount.private_key.length + ' chars)' : 'MISSING'}`);
+    console.log(`    🔑 Private Key Preview: ${serviceAccount.private_key ? serviceAccount.private_key.substring(0, 50) + '...' : 'N/A'}`);
+    console.log(`    ✅ NEW Firebase credentials loaded successfully!`);
+    console.log(`    🎯 Credential Source: EMBEDDED_BASE64_v3.0`);
   } catch (error) {
     console.error('    ❌ Failed to decode Firebase credentials:', error.message);
   }
