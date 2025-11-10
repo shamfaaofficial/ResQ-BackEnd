@@ -15,8 +15,14 @@ class FirebaseConfig {
         console.log('🔥 Firebase: Initializing from FIREBASE_SERVICE_ACCOUNT_JSON env variable...');
         const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
 
+        // Fix private_key: Replace literal \n with actual newlines
+        if (serviceAccount.private_key && typeof serviceAccount.private_key === 'string') {
+          serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+        }
+
         console.log(`    📋 Firebase Project: ${serviceAccount.project_id}`);
         console.log(`    📧 Service Account: ${serviceAccount.client_email}`);
+        console.log(`    🔑 Private Key Format: ${serviceAccount.private_key.includes('\n') ? 'Valid (contains newlines)' : 'Invalid (no newlines)'}`);
 
         this.admin = admin.initializeApp({
           credential: admin.credential.cert(serviceAccount),

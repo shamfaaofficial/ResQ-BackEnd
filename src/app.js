@@ -3,7 +3,7 @@ require('dotenv').config();
 // ============================================================================
 // CONFIGURATION VERIFICATION LOGS (for production debugging)
 // ============================================================================
-const CONFIG_VERSION = '2024-11-10-v2.1'; // Update this when making config changes
+const CONFIG_VERSION = '2024-11-10-v2.2'; // Update this when making config changes
 console.log('\n╔═════════════════════════════════════════════════════════════════╗');
 console.log('║       RESQ Backend - Configuration Initialization              ║');
 console.log('╚═════════════════════════════════════════════════════════════════╝');
