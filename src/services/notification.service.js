@@ -80,19 +80,28 @@ class NotificationService {
       message = `New tow request at ${pickupAddress}. ETA: ${eta} min. Accept within 1 minute.`;
     }
 
+    // Prepare data payload - all values must be strings for FCM
+    const notificationData = {
+      bookingId: bookingId ? String(bookingId) : '',
+      pickupAddress: pickupAddress ? String(pickupAddress) : '',
+      bookingNumber: bookingNumber ? String(bookingNumber) : ''
+    };
+
+    // Only add optional fields if they exist
+    if (eta !== null && eta !== undefined) {
+      notificationData.eta = String(eta);
+    }
+    if (pricing !== null && pricing !== undefined) {
+      notificationData.pricing = String(pricing);
+    }
+
     return this.createNotification({
       driverId,
       bookingId,
       type: NOTIFICATION_TYPE.BOOKING_REQUEST,
       title: 'New Booking Request',
       message,
-      data: {
-        bookingId: bookingId?.toString(),
-        pickupAddress,
-        eta: eta?.toString(),
-        pricing: pricing?.toString(),
-        bookingNumber
-      },
+      data: notificationData,
       dataOnly: true // Send data-only message for booking requests
     });
   }

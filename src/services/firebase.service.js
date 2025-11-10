@@ -20,12 +20,19 @@ class FirebaseService {
     try {
       const messaging = firebaseConfig.getMessaging();
 
+      // Convert all data values to strings (FCM requirement)
+      const stringifiedData = {};
+      for (const [key, value] of Object.entries(data)) {
+        if (value !== null && value !== undefined) {
+          stringifiedData[key] = String(value);
+        }
+      }
+
       const message = {
         data: {
-          ...data,
-          title,
-          body,
-          // Convert all data values to strings (FCM requirement)
+          ...stringifiedData,
+          title: String(title),
+          body: String(body),
           timestamp: new Date().toISOString()
         },
         token: fcmToken,
