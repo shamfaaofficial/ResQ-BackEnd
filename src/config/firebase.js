@@ -12,8 +12,11 @@ class FirebaseConfig {
     try {
       // Method 1: Try to use service account JSON string from environment variable (RECOMMENDED for production)
       if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
-        console.log('🔥 Initializing Firebase from environment variable...');
+        console.log('🔥 Firebase: Initializing from FIREBASE_SERVICE_ACCOUNT_JSON env variable...');
         const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+
+        console.log(`    📋 Firebase Project: ${serviceAccount.project_id}`);
+        console.log(`    📧 Service Account: ${serviceAccount.client_email}`);
 
         this.admin = admin.initializeApp({
           credential: admin.credential.cert(serviceAccount),
@@ -22,7 +25,8 @@ class FirebaseConfig {
 
         this.messaging = admin.messaging();
         this.initialized = true;
-        console.log('✅ Firebase Admin SDK initialized successfully (from env variable)');
+        console.log('    ✅ Firebase Admin SDK initialized successfully!');
+        console.log('    ✅ Firebase Messaging ready for push notifications');
         return;
       }
 
