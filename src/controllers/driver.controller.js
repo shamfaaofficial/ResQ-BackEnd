@@ -6,6 +6,8 @@ const LocationHistory = require('../models/LocationHistory');
 const { ValidationError, NotFoundError, AuthorizationError } = require('../utils/errors');
 const redisService = require('../services/redis.service');
 const { isRedisAvailable } = require('../config/redis');
+const { getIO } = require('../config/socket');
+const mapsService = require('../services/maps.service');
 
 // Get driver profile
 exports.getDriverProfile = asyncHandler(async (req, res) => {
@@ -97,6 +99,53 @@ exports.updateLocation = asyncHandler(async (req, res) => {
       accuracy: accuracy || 0,
       timestamp: new Date()
     });
+
+    // Broadcast location update to user via Socket.IO
+    try {
+      const io = getIO();
+
+      // Get full booking details to find user
+      const booking = await Booking.findById(activeBooking._id).select('userId pickupLocation status');
+
+      if (booking && booking.userId) {
+        // Calculate ETA to pickup if not yet arrived
+        let eta = null;
+        let distanceToPickup = null;
+
+        if (['accepted', 'payment_completed'].includes(booking.status)) {
+          try {
+            const distanceData = await mapsService.calculateDriverToPickupDistance(
+              { type: 'Point', coordinates: [lng, lat] },
+              booking.pickupLocation
+            );
+            eta = distanceData.duration ? `${distanceData.duration} min` : distanceData.durationText;
+            distanceToPickup = distanceData.distanceText;
+          } catch (error) {
+            console.error('[LocationUpdate] Failed to calculate ETA:', error.message);
+          }
+        }
+
+        // Emit to user's personal room
+        io.to(`user:${booking.userId}`).emit('driver:location', {
+          bookingId: activeBooking._id,
+          location: {
+            latitude: lat,
+            longitude: lng,
+            address: address || driver.currentLocation.address
+          },
+          eta: eta,
+          distanceToPickup: distanceToPickup,
+          speed: speed || 0,
+          heading: heading || 0,
+          timestamp: new Date()
+        });
+
+        console.log(`📍 [Location] Broadcasted driver ${driver._id} location to user ${booking.userId}`);
+      }
+    } catch (socketError) {
+      console.error('[LocationUpdate] Socket.IO broadcast failed:', socketError.message);
+      // Don't fail the request if socket broadcast fails
+    }
   }
 
   res.status(200).json({

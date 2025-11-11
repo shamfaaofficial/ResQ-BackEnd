@@ -9,6 +9,7 @@ const { ValidationError, NotFoundError } = require('../utils/errors');
 const { BOOKING_STATUS, BOOKING_REQUEST_TIMEOUT_SECONDS, PAYMENT_TIMEOUT_SECONDS } = require('../config/constants');
 const redisService = require('../services/redis.service');
 const { isRedisAvailable } = require('../config/redis');
+const { emitBookingUpdate } = require('../config/socket');
 
 /**
  * USER BOOKING APIS
@@ -297,6 +298,111 @@ exports.getUserActiveBooking = asyncHandler(async (req, res) => {
   });
 });
 
+// Get live booking status with driver location and ETA (for user app)
+exports.getBookingLiveStatus = asyncHandler(async (req, res) => {
+  const { bookingId } = req.params;
+
+  const booking = await Booking.findOne({
+    _id: bookingId,
+    userId: req.userId
+  })
+  .populate('userId', 'phoneNumber profile')
+  .populate({
+    path: 'driverId',
+    populate: { path: 'userId', select: 'phoneNumber profile' }
+  });
+
+  if (!booking) {
+    throw new NotFoundError('Booking not found');
+  }
+
+  // Only provide live updates for active bookings
+  if (![BOOKING_STATUS.ACCEPTED, BOOKING_STATUS.PAYMENT_COMPLETED, BOOKING_STATUS.DRIVER_ARRIVED, BOOKING_STATUS.IN_PROGRESS].includes(booking.status)) {
+    return res.status(200).json({
+      success: true,
+      data: {
+        booking: {
+          id: booking._id,
+          status: booking.status,
+          message: 'Booking is not in active state'
+        }
+      }
+    });
+  }
+
+  // Get driver details
+  const driver = await Driver.findById(booking.driverId);
+  if (!driver) {
+    throw new NotFoundError('Driver not found');
+  }
+
+  // Calculate ETA and distance if driver location is available
+  let eta = null;
+  let distanceToPickup = null;
+  let driverLocation = null;
+
+  if (driver.currentLocation?.coordinates) {
+    driverLocation = {
+      latitude: driver.currentLocation.coordinates[1],
+      longitude: driver.currentLocation.coordinates[0],
+      address: driver.currentLocation.address
+    };
+
+    // Calculate ETA to pickup if trip hasn't started yet
+    if (booking.status !== BOOKING_STATUS.IN_PROGRESS && booking.status !== BOOKING_STATUS.COMPLETED) {
+      try {
+        const distanceData = await mapsService.calculateDriverToPickupDistance(
+          driver.currentLocation,
+          booking.pickupLocation
+        );
+
+        eta = distanceData.duration ? `${distanceData.duration} min` : distanceData.durationText;
+        distanceToPickup = distanceData.distanceText;
+      } catch (error) {
+        console.error('[LiveStatus] Failed to calculate ETA:', error.message);
+      }
+    }
+  }
+
+  // Prepare driver info
+  const driverInfo = {
+    id: driver._id,
+    name: driver.userId?.profile?.firstName && driver.userId?.profile?.lastName
+      ? `${driver.userId.profile.firstName} ${driver.userId.profile.lastName}`
+      : 'Driver',
+    phoneNumber: driver.userId?.phoneNumber,
+    profileImage: driver.userId?.profile?.profileImage,
+    currentLocation: driverLocation,
+    vehicleDetails: {
+      vehicleType: driver.vehicleDetails?.vehicleType,
+      vehicleNumber: driver.vehicleDetails?.vehicleNumber,
+      vehicleColor: driver.vehicleDetails?.vehicleColor,
+      vehicleMake: driver.vehicleDetails?.vehicleMake,
+      vehicleModel: driver.vehicleDetails?.vehicleModel
+    },
+    rating: driver.rating?.average || 0,
+    totalRatings: driver.rating?.totalRatings || 0
+  };
+
+  res.status(200).json({
+    success: true,
+    data: {
+      bookingId: booking._id,
+      bookingNumber: booking.bookingNumber,
+      status: booking.status,
+      driver: driverInfo,
+      eta: eta,
+      distanceToPickup: distanceToPickup,
+      pickupLocation: booking.pickupLocation,
+      dropoffLocation: booking.dropoffLocation,
+      pricing: booking.pricing,
+      timeline: booking.timeline,
+      verificationCode: booking.verificationCode,
+      lastUpdated: new Date()
+    }
+  });
+});
+
 // Get calculated price for booking (after driver arrives)
 exports.getBookingPrice = asyncHandler(async (req, res) => {
   const { bookingId } = req.params;
@@ -364,6 +470,31 @@ exports.cancelBooking = asyncHandler(async (req, res) => {
   };
   booking.timeline.cancelledAt = new Date();
   await booking.save();
+
+  // Notify driver if booking was already accepted
+  if (booking.driverId) {
+    try {
+      const driver = await Driver.findById(booking.driverId).populate('userId', 'fcmToken');
+      if (driver && driver.userId) {
+        await notificationService.sendNotification(
+          driver.userId._id,
+          'Booking Cancelled',
+          `User cancelled the booking. Reason: ${reason || 'No reason provided'}`,
+          'booking_cancelled',
+          { bookingId: booking._id, cancelledBy: 'user', reason: reason }
+        );
+      }
+    } catch (notifError) {
+      console.error('[CancelBooking] Failed to notify driver:', notifError.message);
+    }
+  }
+
+  // Emit Socket.IO event for real-time update
+  try {
+    emitBookingUpdate(booking);
+  } catch (error) {
+    console.error('[CancelBooking] Failed to emit socket event:', error.message);
+  }
 
   res.status(200).json({
     success: true,
@@ -633,6 +764,21 @@ exports.acceptBooking = asyncHandler(async (req, res) => {
   // Set payment expiry after acceptance (user should pay within 5 minutes)
   booking.paymentExpiresAt = new Date(Date.now() + PAYMENT_TIMEOUT_SECONDS * 1000);
 
+  // ============================================================
+  // AUTO-COMPLETE PAYMENT (TEMPORARY - FOR DEVELOPMENT/TESTING)
+  // TODO: Remove this in production - payment should come from user
+  // ============================================================
+  booking.status = BOOKING_STATUS.PAYMENT_COMPLETED;
+  booking.timeline.paymentCompletedAt = new Date();
+  booking.payment = {
+    status: 'completed',
+    method: 'Auto-completed (Development)',
+    gateway: 'N/A',
+    paidAmount: booking.pricing.totalAmount,
+    paidAt: new Date(),
+    gatewayResponse: { note: 'Auto-completed for testing' }
+  };
+
   await booking.save();
 
   await booking.populate('userId', 'phoneNumber profile');
@@ -645,16 +791,23 @@ exports.acceptBooking = asyncHandler(async (req, res) => {
     driverName
   );
 
+  // Emit Socket.IO event for real-time update
+  try {
+    emitBookingUpdate(booking);
+  } catch (error) {
+    console.error('[AcceptBooking] Failed to emit socket event:', error.message);
+  }
+
   // Prepare response without dropoff location (hidden until trip starts)
   const bookingResponse = booking.toObject();
   delete bookingResponse.dropoffLocation;
 
   res.status(200).json({
     success: true,
-    message: 'Booking accepted successfully',
+    message: 'Booking accepted and payment auto-completed (development mode)',
     data: {
       booking: bookingResponse,
-      note: 'Dropoff location will be revealed when trip starts'
+      note: 'Payment auto-completed for testing. Driver can now navigate to pickup location.'
     }
   });
 });
@@ -744,6 +897,13 @@ exports.markDriverArrived = asyncHandler(async (req, res) => {
     { bookingId: booking._id, verificationCode }
   );
 
+  // Emit Socket.IO event for real-time update
+  try {
+    emitBookingUpdate(booking);
+  } catch (error) {
+    console.error('[MarkDriverArrived] Failed to emit socket event:', error.message);
+  }
+
   res.status(200).json({
     success: true,
     message: 'Arrival confirmed. Verification code generated.',
@@ -783,6 +943,13 @@ exports.startTrip = asyncHandler(async (req, res) => {
 
   // Now reveal the full booking including dropoff location
   await booking.populate('userId', 'phoneNumber profile');
+
+  // Emit Socket.IO event for real-time update
+  try {
+    emitBookingUpdate(booking);
+  } catch (error) {
+    console.error('[StartTrip] Failed to emit socket event:', error.message);
+  }
 
   res.status(200).json({
     success: true,
@@ -842,6 +1009,13 @@ exports.completeTrip = asyncHandler(async (req, res) => {
   driver.earnings.availableBalance += booking.driverEarnings;
   await driver.save();
 
+  // Emit Socket.IO event for real-time update
+  try {
+    emitBookingUpdate(booking);
+  } catch (error) {
+    console.error('[CompleteTrip] Failed to emit socket event:', error.message);
+  }
+
   res.status(200).json({
     success: true,
     message: 'Trip completed successfully',
@@ -879,6 +1053,31 @@ exports.cancelBookingByDriver = asyncHandler(async (req, res) => {
   };
   booking.timeline.cancelledAt = new Date();
   await booking.save();
+
+  // Populate user details for notification
+  await booking.populate('userId', 'phoneNumber profile fcmToken');
+
+  // Send notification to user about cancellation
+  if (booking.userId) {
+    try {
+      await notificationService.sendNotification(
+        booking.userId._id,
+        'Booking Cancelled',
+        `Driver cancelled your booking. Reason: ${reason || 'No reason provided'}`,
+        'booking_cancelled',
+        { bookingId: booking._id, cancelledBy: 'driver', reason: reason }
+      );
+    } catch (notifError) {
+      console.error('[CancelBooking] Failed to send notification:', notifError.message);
+    }
+  }
+
+  // Emit Socket.IO event for real-time update
+  try {
+    emitBookingUpdate(booking);
+  } catch (error) {
+    console.error('[CancelBooking] Failed to emit socket event:', error.message);
+  }
 
   res.status(200).json({
     success: true,

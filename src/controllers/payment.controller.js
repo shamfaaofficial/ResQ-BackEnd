@@ -5,6 +5,7 @@ const Transaction = require('../models/Transaction');
 const notificationService = require('../services/notification.service');
 const { ValidationError, NotFoundError } = require('../utils/errors');
 const { BOOKING_STATUS, PAYMENT_STATUS, TRANSACTION_TYPE } = require('../config/constants');
+const { emitBookingUpdate } = require('../config/socket');
 
 /**
  * USER PAYMENT API - Store payment details from Flutter
@@ -103,6 +104,13 @@ exports.updatePaymentStatus = asyncHandler(async (req, res) => {
           { bookingId: booking._id }
         );
       }
+    }
+
+    // Emit Socket.IO event for real-time update
+    try {
+      emitBookingUpdate(booking);
+    } catch (error) {
+      console.error('[PaymentUpdate] Failed to emit socket event:', error.message);
     }
   }
 

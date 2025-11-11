@@ -39,6 +39,14 @@ router.get(
   bookingController.getUserActiveBooking
 );
 
+// Get live booking status with driver location and ETA (protected - user only)
+router.get(
+  '/user/:bookingId/live-status',
+  authMiddleware,
+  roleMiddleware('user'),
+  bookingController.getBookingLiveStatus
+);
+
 // Get calculated price for booking after driver arrives (protected - user only)
 router.get(
   '/user/:bookingId/price',
