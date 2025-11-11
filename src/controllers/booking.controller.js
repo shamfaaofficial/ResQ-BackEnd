@@ -781,15 +781,24 @@ exports.acceptBooking = asyncHandler(async (req, res) => {
 
   await booking.save();
 
-  await booking.populate('userId', 'phoneNumber profile');
+  await booking.populate('userId', 'phoneNumber profile fcmToken');
 
   // Send notification to user about booking acceptance
-  const driverName = driver.userId?.profile?.fullName || driver.userId?.phoneNumber || 'Driver';
-  await notificationService.notifyBookingAccepted(
-    booking.userId._id,
-    booking._id,
-    driverName
-  );
+  const driverName = driver.userId?.profile?.firstName && driver.userId?.profile?.lastName
+    ? `${driver.userId.profile.firstName} ${driver.userId.profile.lastName}`
+    : driver.userId?.phoneNumber || 'Driver';
+
+  try {
+    await notificationService.notifyBookingAccepted(
+      booking.userId._id,
+      booking._id,
+      driverName
+    );
+    console.log('[AcceptBooking] Booking acceptance notification sent to user');
+  } catch (notifError) {
+    console.error('[AcceptBooking] Failed to send notification to user:', notifError.message);
+    // Don't fail the booking acceptance if notification fails
+  }
 
   // Emit Socket.IO event for real-time update
   try {
