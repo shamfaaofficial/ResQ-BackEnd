@@ -462,6 +462,22 @@ exports.cancelBooking = asyncHandler(async (req, res) => {
     throw new ValidationError('Booking cannot be cancelled');
   }
 
+  // IMPORTANT: Handle payment status based on cancellation
+  const { PAYMENT_STATUS } = require('../config/constants');
+
+  // If payment was completed, mark it for refund
+  if (booking.payment.status === PAYMENT_STATUS.COMPLETED) {
+    booking.payment.status = PAYMENT_STATUS.REFUNDED;
+    booking.payment.refundStatus = 'pending';
+    booking.payment.refundDate = new Date();
+    booking.payment.refundAmount = booking.payment.paidAmount || booking.pricing.totalAmount;
+  } else if (booking.payment.status === PAYMENT_STATUS.PENDING) {
+    // If payment was pending, mark it as failed since user cancelled
+    booking.payment.status = PAYMENT_STATUS.FAILED;
+    booking.payment.failedAt = new Date();
+  }
+  // If already failed, keep it as failed
+
   booking.status = BOOKING_STATUS.CANCELLED_BY_USER;
   booking.cancellationDetails = {
     cancelledBy: 'user',
@@ -1053,6 +1069,22 @@ exports.cancelBookingByDriver = asyncHandler(async (req, res) => {
   if ([BOOKING_STATUS.COMPLETED, BOOKING_STATUS.CANCELLED_BY_USER, BOOKING_STATUS.CANCELLED_BY_DRIVER].includes(booking.status)) {
     throw new ValidationError('Booking cannot be cancelled');
   }
+
+  // IMPORTANT: Handle payment status based on cancellation
+  const { PAYMENT_STATUS } = require('../config/constants');
+
+  // If payment was completed, mark it for refund
+  if (booking.payment.status === PAYMENT_STATUS.COMPLETED) {
+    booking.payment.status = PAYMENT_STATUS.REFUNDED;
+    booking.payment.refundStatus = 'pending';
+    booking.payment.refundDate = new Date();
+    booking.payment.refundAmount = booking.payment.paidAmount || booking.pricing.totalAmount;
+  } else if (booking.payment.status === PAYMENT_STATUS.PENDING) {
+    // If payment was pending, mark it as failed since driver cancelled
+    booking.payment.status = PAYMENT_STATUS.FAILED;
+    booking.payment.failedAt = new Date();
+  }
+  // If already failed, keep it as failed
 
   booking.status = BOOKING_STATUS.CANCELLED_BY_DRIVER;
   booking.cancellationDetails = {

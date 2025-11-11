@@ -1,6 +1,6 @@
 const cron = require('node-cron');
 const Booking = require('../models/Booking');
-const { BOOKING_STATUS } = require('../config/constants');
+const { BOOKING_STATUS, PAYMENT_STATUS } = require('../config/constants');
 const notificationService = require('../services/notification.service');
 
 // Run every minute to check for expired bookings
@@ -15,6 +15,12 @@ cron.schedule('* * * * *', async () => {
     });
 
     for (const booking of expiredRequests) {
+      // Set payment status to FAILED since no driver accepted
+      if (booking.payment.status === PAYMENT_STATUS.PENDING) {
+        booking.payment.status = PAYMENT_STATUS.FAILED;
+        booking.payment.failedAt = now;
+      }
+
       booking.status = BOOKING_STATUS.CANCELLED_BY_DRIVER;
       booking.cancellationDetails = {
         cancelledBy: 'system',
@@ -41,6 +47,12 @@ cron.schedule('* * * * *', async () => {
     });
 
     for (const booking of expiredPayments) {
+      // Set payment status to FAILED since payment timed out
+      if (booking.payment.status === PAYMENT_STATUS.PENDING) {
+        booking.payment.status = PAYMENT_STATUS.FAILED;
+        booking.payment.failedAt = now;
+      }
+
       booking.status = BOOKING_STATUS.CANCELLED_BY_USER;
       booking.cancellationDetails = {
         cancelledBy: 'system',

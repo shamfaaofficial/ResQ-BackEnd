@@ -46,11 +46,9 @@ exports.updatePaymentStatus = asyncHandler(async (req, res) => {
       mappedStatus = PAYMENT_STATUS.COMPLETED;
       break;
     case 'failed':
-      mappedStatus = PAYMENT_STATUS.FAILED;
-      break;
     case 'cancelled':
     case 'canceled':
-      mappedStatus = PAYMENT_STATUS.CANCELLED;
+      mappedStatus = PAYMENT_STATUS.FAILED;
       break;
     case 'pending':
       mappedStatus = PAYMENT_STATUS.PENDING;
