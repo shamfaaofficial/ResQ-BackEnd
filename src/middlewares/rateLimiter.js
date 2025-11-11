@@ -5,7 +5,7 @@ const { getRedisClient, isRedisAvailable } = require('../config/redis');
 // General API rate limiter
 const generalLimiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 1000, // Increased to 1000
   message: {
     success: false,
     error: {
@@ -76,10 +76,10 @@ const paymentLimiter = rateLimit({
   }
 });
 
-// Location update limiter - 4 requests per minute (every 15-20 seconds)
+// Location update limiter - 60 requests per minute (every second allowed)
 const locationUpdateLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 4, // 4 updates per minute (every 15 seconds minimum)
+  max: 60, // 60 updates per minute (every second allowed)
   message: {
     success: false,
     error: {
