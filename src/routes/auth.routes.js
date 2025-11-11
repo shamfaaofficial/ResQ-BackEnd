@@ -31,8 +31,10 @@ router.post(
   authController.driverSubmitDocuments
 );
 
-// Admin Authentication Routes (Placeholder)
-router.post('/admin/login', authController.adminLogin);
+// Admin Authentication Routes (OTP-based only)
+router.post('/admin/login', authController.adminLogin); // Send OTP
+router.post('/admin/verify-otp', authController.adminVerifyOTP); // Verify OTP and login
+router.post('/admin/refresh-token', authController.adminRefreshToken);
 
 // Logout (Protected)
 router.post('/logout', authMiddleware, authController.logout);

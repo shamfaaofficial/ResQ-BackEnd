@@ -604,7 +604,8 @@ exports.acceptBooking = asyncHandler(async (req, res) => {
   const { bookingId } = req.params;
 
   // Get driver profile
-  const driver = await Driver.findOne({ userId: req.userId });
+  const driver = await Driver.findOne({ userId: req.userId })
+    .populate('userId', 'phoneNumber profile');
   if (!driver) {
     throw new NotFoundError('Driver profile not found');
   }
@@ -635,6 +636,14 @@ exports.acceptBooking = asyncHandler(async (req, res) => {
   await booking.save();
 
   await booking.populate('userId', 'phoneNumber profile');
+
+  // Send notification to user about booking acceptance
+  const driverName = driver.userId?.profile?.fullName || driver.userId?.phoneNumber || 'Driver';
+  await notificationService.notifyBookingAccepted(
+    booking.userId._id,
+    booking._id,
+    driverName
+  );
 
   // Prepare response without dropoff location (hidden until trip starts)
   const bookingResponse = booking.toObject();

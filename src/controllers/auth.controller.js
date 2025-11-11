@@ -644,11 +644,134 @@ exports.driverSubmitDocuments = asyncHandler(async (req, res) => {
 });
 
 /**
- * ADMIN AUTHENTICATION (Placeholder - to be fully implemented)
+ * ADMIN AUTHENTICATION (OTP-based only)
  */
 
+// Send OTP for admin login
 exports.adminLogin = asyncHandler(async (req, res) => {
-  res.status(501).json({ success: false, message: 'Admin login - to be implemented' });
+  const { phoneNumber } = req.body;
+
+  if (!phoneNumber) {
+    throw new ValidationError('Phone number is required');
+  }
+
+  // Check if admin exists
+  const admin = await User.findOne({ phoneNumber, role: 'admin' });
+  if (!admin) {
+    throw new AuthenticationError('Admin not found with this phone number');
+  }
+
+  // Check if account is active
+  if (!admin.isActive) {
+    throw new AuthenticationError('Account is deactivated');
+  }
+
+  // Generate OTP
+  const { otpCode } = await otpService.generateOTP(phoneNumber, OTP_PURPOSE.LOGIN);
+
+  // Send OTP via SMS
+  await smsService.sendOTP(phoneNumber, otpCode, OTP_PURPOSE.LOGIN);
+
+  res.status(200).json({
+    success: true,
+    message: 'OTP sent successfully to your phone number',
+    data: {
+      phoneNumber,
+      expiresIn: '5 minutes'
+    }
+  });
+});
+
+// Verify OTP and complete admin login
+exports.adminVerifyOTP = asyncHandler(async (req, res) => {
+  const { phoneNumber, otp } = req.body;
+
+  // Validate required fields
+  if (!phoneNumber || !otp) {
+    throw new ValidationError('Phone number and OTP are required');
+  }
+
+  // Verify OTP
+  const isValid = await otpService.verifyOTP(phoneNumber, otp, OTP_PURPOSE.LOGIN);
+  if (!isValid) {
+    throw new ValidationError('Invalid or expired OTP');
+  }
+
+  // Find admin
+  const admin = await User.findOne({ phoneNumber, role: 'admin' });
+  if (!admin) {
+    throw new AuthenticationError('Admin not found');
+  }
+
+  // Check if account is active
+  if (!admin.isActive) {
+    throw new AuthenticationError('Account is deactivated');
+  }
+
+  // Generate tokens
+  const accessToken = generateAccessToken(admin._id, admin.role);
+  const refreshToken = generateRefreshToken(admin._id, admin.role);
+
+  // Clean expired tokens and add new refresh token
+  admin.cleanExpiredTokens();
+  admin.refreshTokens.push({ token: refreshToken });
+  await admin.save();
+
+  res.status(200).json({
+    success: true,
+    message: 'Login successful',
+    data: {
+      user: {
+        id: admin._id,
+        phoneNumber: admin.phoneNumber,
+        role: admin.role,
+        username: admin.username
+      },
+      accessToken,
+      refreshToken
+    }
+  });
+});
+
+// Admin refresh access token
+exports.adminRefreshToken = asyncHandler(async (req, res) => {
+  const { refreshToken } = req.body;
+
+  if (!refreshToken) {
+    throw new ValidationError('Refresh token is required');
+  }
+
+  // Verify refresh token
+  const jwt = require('jsonwebtoken');
+  let decoded;
+  try {
+    decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+  } catch (error) {
+    throw new AuthenticationError('Invalid or expired refresh token');
+  }
+
+  // Find user (admin) and verify refresh token matches
+  const user = await User.findById(decoded.userId);
+  if (!user || user.role !== 'admin') {
+    throw new AuthenticationError('Invalid refresh token');
+  }
+
+  // Check if refresh token exists in user's tokens array
+  const tokenExists = user.refreshTokens.some(rt => rt.token === refreshToken);
+  if (!tokenExists) {
+    throw new AuthenticationError('Invalid refresh token');
+  }
+
+  // Generate new access token
+  const accessToken = generateAccessToken(user._id, user.role);
+
+  res.status(200).json({
+    success: true,
+    message: 'Access token refreshed successfully',
+    data: {
+      accessToken
+    }
+  });
 });
 
 /**
