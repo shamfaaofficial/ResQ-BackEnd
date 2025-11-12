@@ -302,6 +302,8 @@ exports.getUserActiveBooking = asyncHandler(async (req, res) => {
 exports.getBookingStatus = asyncHandler(async (req, res) => {
   const { bookingId } = req.params;
 
+  console.log('[GetBookingStatus] Fetching booking status for:', bookingId);
+
   const booking = await Booking.findOne({
     _id: bookingId,
     userId: req.userId
@@ -313,10 +315,15 @@ exports.getBookingStatus = asyncHandler(async (req, res) => {
   .select('bookingNumber status payment timeline cancellationDetails driverId pricing');
 
   if (!booking) {
+    console.log('[GetBookingStatus] ❌ Booking not found');
     throw new NotFoundError('Booking not found');
   }
 
-  res.status(200).json({
+  console.log('[GetBookingStatus] Booking status:', booking.status);
+  console.log('[GetBookingStatus] Payment status from DB:', booking.payment.status);
+  console.log('[GetBookingStatus] Full payment object:', JSON.stringify(booking.payment, null, 2));
+
+  const responseData = {
     success: true,
     data: {
       bookingId: booking._id,
@@ -338,7 +345,11 @@ exports.getBookingStatus = asyncHandler(async (req, res) => {
       timeline: booking.timeline,
       pricing: booking.pricing
     }
-  });
+  };
+
+  console.log('[GetBookingStatus] Response payment status:', responseData.data.payment.status);
+
+  res.status(200).json(responseData);
 });
 
 // Get live booking status with driver location and ETA (for user app)
@@ -1099,35 +1110,116 @@ exports.cancelBookingByDriver = asyncHandler(async (req, res) => {
   const { bookingId } = req.params;
   const { reason } = req.body;
 
+  console.log('\n========== DRIVER CANCELLATION STARTED ==========');
+  console.log('[CancelBookingByDriver] Booking ID:', bookingId);
+  console.log('[CancelBookingByDriver] Cancellation reason:', reason);
+
   const driver = await Driver.findOne({ userId: req.userId });
-  const booking = await Booking.findOne({
+  console.log('[CancelBookingByDriver] Driver ID:', driver?._id);
+
+  // First, try to find booking assigned to this driver
+  let booking = await Booking.findOne({
     _id: bookingId,
     driverId: driver._id
   });
 
+  // If not found, check if this is a REQUESTED booking that driver wants to reject
   if (!booking) {
+    console.log('[CancelBookingByDriver] Booking not found with driverId, checking for REQUESTED status...');
+    booking = await Booking.findOne({
+      _id: bookingId,
+      status: BOOKING_STATUS.REQUESTED
+    });
+
+    if (booking) {
+      console.log('[CancelBookingByDriver] Found REQUESTED booking - driver is rejecting before acceptance');
+    }
+  }
+
+  if (!booking) {
+    console.log('[CancelBookingByDriver] ❌ Booking not found or not accessible to this driver');
     throw new NotFoundError('Booking not found');
   }
 
+  console.log('[CancelBookingByDriver] Current booking status:', booking.status);
+  console.log('[CancelBookingByDriver] Current driverId:', booking.driverId);
+  console.log('[CancelBookingByDriver] Current payment status:', booking.payment?.status);
+  console.log('[CancelBookingByDriver] Payment details:', JSON.stringify(booking.payment, null, 2));
+
   if ([BOOKING_STATUS.COMPLETED, BOOKING_STATUS.CANCELLED_BY_USER, BOOKING_STATUS.CANCELLED_BY_DRIVER].includes(booking.status)) {
+    console.log('[CancelBookingByDriver] ❌ Booking cannot be cancelled - already in final state');
     throw new ValidationError('Booking cannot be cancelled');
   }
+
+  // Special case: If booking is REQUESTED and has no driverId, this is a rejection before acceptance
+  const isRejectionBeforeAcceptance = booking.status === BOOKING_STATUS.REQUESTED && !booking.driverId;
+  console.log('[CancelBookingByDriver] Is rejection before acceptance?', isRejectionBeforeAcceptance);
 
   // IMPORTANT: Handle payment status based on cancellation
   const { PAYMENT_STATUS } = require('../config/constants');
 
-  // If payment was completed, mark it for refund
-  if (booking.payment.status === PAYMENT_STATUS.COMPLETED) {
-    booking.payment.status = PAYMENT_STATUS.REFUNDED;
-    booking.payment.refundStatus = 'pending';
-    booking.payment.refundDate = new Date();
-    booking.payment.refundAmount = booking.payment.paidAmount || booking.pricing.totalAmount;
-  } else if (booking.payment.status === PAYMENT_STATUS.PENDING) {
-    // If payment was pending, mark it as failed since driver cancelled
-    booking.payment.status = PAYMENT_STATUS.FAILED;
-    booking.payment.failedAt = new Date();
+  console.log('[CancelBookingByDriver] Checking payment status for refund handling...');
+  console.log('[CancelBookingByDriver] PAYMENT_STATUS.COMPLETED:', PAYMENT_STATUS.COMPLETED);
+  console.log('[CancelBookingByDriver] PAYMENT_STATUS.PENDING:', PAYMENT_STATUS.PENDING);
+  console.log('[CancelBookingByDriver] PAYMENT_STATUS.FAILED:', PAYMENT_STATUS.FAILED);
+  console.log('[CancelBookingByDriver] PAYMENT_STATUS.REFUNDED:', PAYMENT_STATUS.REFUNDED);
+  console.log('[CancelBookingByDriver] Current booking.payment.status:', booking.payment.status);
+  console.log('[CancelBookingByDriver] Type of booking.payment.status:', typeof booking.payment.status);
+  console.log('[CancelBookingByDriver] Strict equality check (COMPLETED):', booking.payment.status === PAYMENT_STATUS.COMPLETED);
+  console.log('[CancelBookingByDriver] Strict equality check (PENDING):', booking.payment.status === PAYMENT_STATUS.PENDING);
+  console.log('[CancelBookingByDriver] Loose equality check (completed string):', booking.payment.status === 'completed');
+  console.log('[CancelBookingByDriver] Loose equality check (pending string):', booking.payment.status === 'pending');
+
+  // Handle payment status based on current state
+  const currentPaymentStatus = booking.payment?.status || PAYMENT_STATUS.PENDING;
+
+  switch (currentPaymentStatus) {
+    case PAYMENT_STATUS.COMPLETED:
+    case 'completed': // Fallback for string literal
+      console.log('[CancelBookingByDriver] ✅ Payment was COMPLETED - marking for REFUND');
+      booking.payment.status = PAYMENT_STATUS.REFUNDED;
+      booking.payment.refundStatus = 'pending';
+      booking.payment.refundDate = new Date();
+      booking.payment.refundAmount = booking.payment.paidAmount || booking.pricing.totalAmount;
+      console.log('[CancelBookingByDriver] Payment status updated to:', booking.payment.status);
+      break;
+
+    case PAYMENT_STATUS.PENDING:
+    case 'pending': // Fallback for string literal
+      console.log('[CancelBookingByDriver] ✅ Payment was PENDING - marking as FAILED');
+      booking.payment.status = PAYMENT_STATUS.FAILED;
+      booking.payment.failedAt = new Date();
+      console.log('[CancelBookingByDriver] Payment status updated to:', booking.payment.status);
+      break;
+
+    case PAYMENT_STATUS.FAILED:
+    case 'failed':
+      console.log('[CancelBookingByDriver] ℹ️ Payment already FAILED - keeping status');
+      break;
+
+    case PAYMENT_STATUS.REFUNDED:
+    case 'refunded':
+      console.log('[CancelBookingByDriver] ℹ️ Payment already REFUNDED - keeping status');
+      break;
+
+    default:
+      console.log('[CancelBookingByDriver] ⚠️ Unknown payment status:', currentPaymentStatus);
+      // If payment status is unknown and booking was accepted, mark for refund to be safe
+      if (booking.driverId) {
+        console.log('[CancelBookingByDriver] ⚠️ Booking was accepted, defaulting to REFUNDED for safety');
+        booking.payment.status = PAYMENT_STATUS.REFUNDED;
+        booking.payment.refundStatus = 'pending';
+        booking.payment.refundDate = new Date();
+        booking.payment.refundAmount = booking.pricing.totalAmount;
+      } else {
+        console.log('[CancelBookingByDriver] ⚠️ Booking not accepted, defaulting to FAILED');
+        booking.payment.status = PAYMENT_STATUS.FAILED;
+        booking.payment.failedAt = new Date();
+      }
+      break;
   }
-  // If already failed, keep it as failed
+
+  console.log('[CancelBookingByDriver] Final payment status after switch:', booking.payment.status);
 
   booking.status = BOOKING_STATUS.CANCELLED_BY_DRIVER;
   booking.cancellationDetails = {
@@ -1136,14 +1228,22 @@ exports.cancelBookingByDriver = asyncHandler(async (req, res) => {
     cancelledAt: new Date()
   };
   booking.timeline.cancelledAt = new Date();
+
+  console.log('[CancelBookingByDriver] Saving booking with updated status...');
   await booking.save();
+  console.log('[CancelBookingByDriver] ✅ Booking saved successfully');
+  console.log('[CancelBookingByDriver] Final booking status:', booking.status);
+  console.log('[CancelBookingByDriver] Final payment status:', booking.payment.status);
 
   // Populate user details for notification
+  console.log('[CancelBookingByDriver] Populating user details for notification...');
   await booking.populate('userId', 'phoneNumber profile fcmToken');
+  console.log('[CancelBookingByDriver] User details populated - User ID:', booking.userId._id);
 
   // Send notification to user about cancellation
   if (booking.userId) {
     try {
+      console.log('[CancelBookingByDriver] Sending cancellation notification to user...');
       await notificationService.sendNotification(
         booking.userId._id,
         'Booking Cancelled',
@@ -1151,23 +1251,38 @@ exports.cancelBookingByDriver = asyncHandler(async (req, res) => {
         'booking_cancelled',
         { bookingId: booking._id, cancelledBy: 'driver', reason: reason }
       );
+      console.log('[CancelBookingByDriver] ✅ Notification sent successfully');
     } catch (notifError) {
-      console.error('[CancelBooking] Failed to send notification:', notifError.message);
+      console.error('[CancelBookingByDriver] ❌ Failed to send notification:', notifError.message);
     }
+  } else {
+    console.log('[CancelBookingByDriver] ⚠️ No user found for notification');
   }
 
   // Emit Socket.IO event for real-time update
   try {
+    console.log('[CancelBookingByDriver] Emitting socket event for booking update...');
     emitBookingUpdate(booking);
+    console.log('[CancelBookingByDriver] ✅ Socket event emitted successfully');
   } catch (error) {
-    console.error('[CancelBooking] Failed to emit socket event:', error.message);
+    console.error('[CancelBookingByDriver] ❌ Failed to emit socket event:', error.message);
   }
 
-  res.status(200).json({
+  console.log('[CancelBookingByDriver] Preparing response...');
+  console.log('[CancelBookingByDriver] Response booking payment status:', booking.payment.status);
+  console.log('[CancelBookingByDriver] Response booking status:', booking.status);
+  console.log('[CancelBookingByDriver] Full booking.payment object:', JSON.stringify(booking.payment, null, 2));
+  console.log('========== DRIVER CANCELLATION COMPLETED ==========\n');
+
+  const responseData = {
     success: true,
     message: 'Booking cancelled successfully',
     data: { booking }
-  });
+  };
+
+  console.log('[CancelBookingByDriver] Response payment status in JSON:', responseData.data.booking.payment.status);
+
+  res.status(200).json(responseData);
 });
 
 // Get driver's booking history
