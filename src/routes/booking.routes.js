@@ -39,6 +39,14 @@ router.get(
   bookingController.getUserActiveBooking
 );
 
+// Get booking status by ID including payment info (protected - user only)
+router.get(
+  '/user/:bookingId/status',
+  authMiddleware,
+  roleMiddleware('user'),
+  bookingController.getBookingStatus
+);
+
 // Get live booking status with driver location and ETA (protected - user only)
 router.get(
   '/user/:bookingId/live-status',

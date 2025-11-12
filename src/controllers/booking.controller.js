@@ -298,6 +298,49 @@ exports.getUserActiveBooking = asyncHandler(async (req, res) => {
   });
 });
 
+// Get booking status by ID (including cancelled bookings with payment info)
+exports.getBookingStatus = asyncHandler(async (req, res) => {
+  const { bookingId } = req.params;
+
+  const booking = await Booking.findOne({
+    _id: bookingId,
+    userId: req.userId
+  })
+  .populate({
+    path: 'driverId',
+    populate: { path: 'userId', select: 'phoneNumber profile' }
+  })
+  .select('bookingNumber status payment timeline cancellationDetails driverId pricing');
+
+  if (!booking) {
+    throw new NotFoundError('Booking not found');
+  }
+
+  res.status(200).json({
+    success: true,
+    data: {
+      bookingId: booking._id,
+      bookingNumber: booking.bookingNumber,
+      status: booking.status,
+      payment: {
+        status: booking.payment.status,
+        method: booking.payment.method,
+        paidAmount: booking.payment.paidAmount,
+        paidAt: booking.payment.paidAt,
+        failedAt: booking.payment.failedAt
+      },
+      cancellationDetails: booking.cancellationDetails || null,
+      driver: booking.driverId ? {
+        id: booking.driverId._id,
+        name: booking.driverId.userId?.profile?.firstName || 'Driver',
+        phoneNumber: booking.driverId.userId?.phoneNumber
+      } : null,
+      timeline: booking.timeline,
+      pricing: booking.pricing
+    }
+  });
+});
+
 // Get live booking status with driver location and ETA (for user app)
 exports.getBookingLiveStatus = asyncHandler(async (req, res) => {
   const { bookingId } = req.params;
