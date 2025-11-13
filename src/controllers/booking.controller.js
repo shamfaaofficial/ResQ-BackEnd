@@ -1465,29 +1465,49 @@ exports.requestSpecificDriver = asyncHandler(async (req, res) => {
 
   // Emit socket event to driver for real-time notification
   try {
-    emitToUser(driver._id, 'booking:new:request', {
-      bookingId: booking._id.toString(),
-      bookingNumber: booking.bookingNumber,
-      pickupLocation: {
-        address: pickupLocation.address,
-        coordinates: pickupLocation.coordinates
-      },
-      dropoffLocation: {
-        address: dropoffLocation.address,
-        coordinates: dropoffLocation.coordinates
-      },
-      vehicleType: booking.vehicleType,
-      pricing: {
-        total: totalAmount,
-        basePrice: basePrice,
-        perKmRate: perKmRate,
-        distance: tripRoute.distance
-      },
-      eta: driverToPickup.duration,
-      expiresAt: booking.requestExpiresAt,
-      timestamp: new Date().toISOString()
-    });
-    console.log('[RequestDriver] Socket event emitted to driver:', driver._id);
+    const { getIO } = require('../services/socket.service');
+    const io = getIO();
+
+    if (io) {
+      const bookingPayload = {
+        bookingId: booking._id.toString(),
+        bookingNumber: booking.bookingNumber,
+        pickupLocation: {
+          address: pickupLocation.address,
+          coordinates: pickupLocation.coordinates
+        },
+        dropoffLocation: {
+          address: dropoffLocation.address,
+          coordinates: dropoffLocation.coordinates
+        },
+        vehicleType: booking.vehicleType,
+        pricing: {
+          total: totalAmount,
+          basePrice: basePrice,
+          perKmRate: perKmRate,
+          distance: tripRoute.distance
+        },
+        eta: driverToPickup.duration,
+        expiresAt: booking.requestExpiresAt,
+        userId: booking.userId.toString(),
+        status: 'requested',
+        createdAt: booking.createdAt,
+        timestamp: new Date().toISOString()
+      };
+
+      console.log(`\n📤 [Socket Emit] Emitting booking:new:request to DRIVER`);
+      console.log(`   Driver ID: ${driver._id}`);
+      console.log(`   Target Room: driver:${driver._id}`);
+      console.log(`   Booking ID: ${booking._id}`);
+
+      // Emit to driver's personal room
+      io.to(`driver:${driver._id}`).emit('booking:new:request', bookingPayload);
+
+      console.log(`   ✅ Event emitted successfully to driver room`);
+      console.log(`   Payload:`, JSON.stringify(bookingPayload, null, 2));
+    } else {
+      console.log(`⚠️  [Socket] Cannot emit - Socket.io not initialized`);
+    }
   } catch (socketError) {
     console.error('[RequestDriver] Failed to emit socket event:', socketError.message);
     // Don't fail the request if socket emission fails

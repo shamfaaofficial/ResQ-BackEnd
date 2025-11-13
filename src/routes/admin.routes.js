@@ -3,11 +3,19 @@ const router = express.Router();
 const adminUserController = require('../controllers/admin.user.controller');
 const adminDriverController = require('../controllers/admin.driver.controller');
 const adminTripController = require('../controllers/admin.trip.controller');
+const adminDashboardController = require('../controllers/admin.dashboard.controller');
 const { authMiddleware, roleMiddleware } = require('../middlewares/auth');
 
 // All admin routes require authentication and admin role
 router.use(authMiddleware);
 router.use(roleMiddleware('admin'));
+
+/**
+ * DASHBOARD ROUTES
+ */
+
+// Get dashboard statistics
+router.get('/dashboard/stats', adminDashboardController.getDashboardStats);
 
 /**
  * USER MANAGEMENT ROUTES
