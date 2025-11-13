@@ -1,101 +1,16 @@
-const { Server } = require('socket.io');
-const jwt = require('jsonwebtoken');
-const User = require('../models/User');
-const Driver = require('../models/Driver');
-
-let io;
+// Import the Socket.IO instance from config/socket.js
+const { getIO: getSocketIO } = require('../config/socket');
 
 /**
- * Initialize Socket.IO server
- * @param {Object} httpServer - HTTP server instance
- */
-const initializeSocket = (httpServer) => {
-  io = new Server(httpServer, {
-    cors: {
-      origin: process.env.CORS_ORIGIN || '*',
-      methods: ['GET', 'POST'],
-      credentials: true,
-    },
-    pingTimeout: 60000,
-    pingInterval: 25000,
-  });
-
-  // Authentication middleware for socket connections
-  io.use(async (socket, next) => {
-    try {
-      const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.split(' ')[1];
-
-      if (!token) {
-        return next(new Error('Authentication error: No token provided'));
-      }
-
-      const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
-
-      // Fetch user or driver based on role
-      let user;
-      if (decoded.role === 'driver') {
-        user = await Driver.findById(decoded.userId);
-      } else {
-        user = await User.findById(decoded.userId);
-      }
-
-      if (!user) {
-        return next(new Error('Authentication error: User not found'));
-      }
-
-      socket.userId = decoded.userId;
-      socket.userRole = decoded.role;
-      next();
-    } catch (error) {
-      next(new Error('Authentication error: Invalid token'));
-    }
-  });
-
-  io.on('connection', (socket) => {
-    console.log(`User connected: ${socket.userId} (${socket.userRole})`);
-
-    // Join user to their personal room
-    socket.join(`user:${socket.userId}`);
-
-    // Handle driver joining booking room
-    socket.on('join_booking', (bookingId) => {
-      socket.join(`booking:${bookingId}`);
-      console.log(`${socket.userRole} ${socket.userId} joined booking:${bookingId}`);
-    });
-
-    // Handle driver leaving booking room
-    socket.on('leave_booking', (bookingId) => {
-      socket.leave(`booking:${bookingId}`);
-      console.log(`${socket.userRole} ${socket.userId} left booking:${bookingId}`);
-    });
-
-    // Handle driver location updates (real-time)
-    socket.on('driver_location_update', (data) => {
-      if (socket.userRole === 'driver' && data.bookingId) {
-        // Broadcast to all users in this booking room
-        socket.to(`booking:${data.bookingId}`).emit('driver_location_changed', {
-          location: data.location,
-          timestamp: new Date(),
-        });
-      }
-    });
-
-    socket.on('disconnect', () => {
-      console.log(`User disconnected: ${socket.userId}`);
-    });
-  });
-
-  return io;
-};
-
-/**
- * Get Socket.IO instance
+ * Get Socket.IO instance from config
  */
 const getIO = () => {
-  if (!io) {
-    throw new Error('Socket.IO not initialized');
+  try {
+    return getSocketIO();
+  } catch (error) {
+    console.log(`⚠️  [Socket Service] Socket.io not initialized yet`);
+    return null;
   }
-  return io;
 };
 
 /**
@@ -105,6 +20,8 @@ const getIO = () => {
  * @param {Object} data - Event data
  */
 const emitToUser = (userId, event, data) => {
+  const io = getIO();
+
   if (!io) {
     console.log(`⚠️  [Socket Service] Cannot emit - Socket.io not initialized`);
     console.log(`   Target User: ${userId}`);
@@ -131,6 +48,8 @@ const emitToUser = (userId, event, data) => {
  * @param {Object} data - Event data
  */
 const emitToBooking = (bookingId, event, data) => {
+  const io = getIO();
+
   if (!io) {
     console.log(`⚠️  [Socket Service] Cannot emit - Socket.io not initialized`);
     console.log(`   Target Booking: ${bookingId}`);
@@ -211,7 +130,6 @@ const notifyDriverArrival = (userId, bookingId, driver) => {
 };
 
 module.exports = {
-  initializeSocket,
   getIO,
   emitToUser,
   emitToBooking,
