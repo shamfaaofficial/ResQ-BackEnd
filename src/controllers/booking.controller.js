@@ -1479,8 +1479,8 @@ exports.requestSpecificDriver = asyncHandler(async (req, res) => {
       vehicleType: booking.vehicleType,
       pricing: {
         total: totalAmount,
-        basePrice: pricingConfig.basePrice,
-        perKmRate: pricingConfig.perKmRate,
+        basePrice: basePrice,
+        perKmRate: perKmRate,
         distance: tripRoute.distance
       },
       eta: driverToPickup.duration,
