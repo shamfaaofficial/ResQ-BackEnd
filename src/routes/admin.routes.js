@@ -38,7 +38,7 @@ router.delete('/users/:userId', adminUserController.deleteUser);
 // Get all drivers with pagination and filters
 router.get('/drivers', adminDriverController.getAllDrivers);
 
-// Get driver statistics
+// Get driver statistics (MUST be before /:driverId to avoid route conflict)
 router.get('/drivers/statistics', adminDriverController.getDriverStatistics);
 
 // Get specific driver by ID

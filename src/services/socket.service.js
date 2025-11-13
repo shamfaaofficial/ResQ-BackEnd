@@ -105,9 +105,23 @@ const getIO = () => {
  * @param {Object} data - Event data
  */
 const emitToUser = (userId, event, data) => {
-  if (io) {
-    io.to(`user:${userId}`).emit(event, data);
+  if (!io) {
+    console.log(`⚠️  [Socket Service] Cannot emit - Socket.io not initialized`);
+    console.log(`   Target User: ${userId}`);
+    console.log(`   Event: ${event}`);
+    return;
   }
+
+  console.log(`\n📤 [Socket Service] Emitting event to user`);
+  console.log(`   Event: ${event}`);
+  console.log(`   Target User ID: ${userId}`);
+  console.log(`   Target Room: user:${userId}`);
+  console.log(`   Timestamp: ${new Date().toISOString()}`);
+  console.log(`   Payload:`, JSON.stringify(data, null, 2));
+
+  io.to(`user:${userId}`).emit(event, data);
+
+  console.log(`   ✅ Event emitted successfully`);
 };
 
 /**
@@ -117,9 +131,23 @@ const emitToUser = (userId, event, data) => {
  * @param {Object} data - Event data
  */
 const emitToBooking = (bookingId, event, data) => {
-  if (io) {
-    io.to(`booking:${bookingId}`).emit(event, data);
+  if (!io) {
+    console.log(`⚠️  [Socket Service] Cannot emit - Socket.io not initialized`);
+    console.log(`   Target Booking: ${bookingId}`);
+    console.log(`   Event: ${event}`);
+    return;
   }
+
+  console.log(`\n📤 [Socket Service] Emitting event to booking room`);
+  console.log(`   Event: ${event}`);
+  console.log(`   Target Booking ID: ${bookingId}`);
+  console.log(`   Target Room: booking:${bookingId}`);
+  console.log(`   Timestamp: ${new Date().toISOString()}`);
+  console.log(`   Payload:`, JSON.stringify(data, null, 2));
+
+  io.to(`booking:${bookingId}`).emit(event, data);
+
+  console.log(`   ✅ Event emitted successfully`);
 };
 
 /**
