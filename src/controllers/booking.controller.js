@@ -10,6 +10,7 @@ const { BOOKING_STATUS, BOOKING_REQUEST_TIMEOUT_SECONDS, PAYMENT_TIMEOUT_SECONDS
 const redisService = require('../services/redis.service');
 const { isRedisAvailable } = require('../config/redis');
 const { emitBookingUpdate } = require('../config/socket');
+const { emitToUser } = require('../services/socket.service');
 
 /**
  * USER BOOKING APIS
@@ -1460,6 +1461,36 @@ exports.requestSpecificDriver = asyncHandler(async (req, res) => {
   } catch (notificationError) {
     console.error('[RequestDriver] Failed to send notification to driver:', notificationError.message);
     // Don't fail the request if notification fails
+  }
+
+  // Emit socket event to driver for real-time notification
+  try {
+    emitToUser(driver._id, 'booking:new:request', {
+      bookingId: booking._id.toString(),
+      bookingNumber: booking.bookingNumber,
+      pickupLocation: {
+        address: pickupLocation.address,
+        coordinates: pickupLocation.coordinates
+      },
+      dropoffLocation: {
+        address: dropoffLocation.address,
+        coordinates: dropoffLocation.coordinates
+      },
+      vehicleType: booking.vehicleType,
+      pricing: {
+        total: totalAmount,
+        basePrice: pricingConfig.basePrice,
+        perKmRate: pricingConfig.perKmRate,
+        distance: tripRoute.distance
+      },
+      eta: driverToPickup.duration,
+      expiresAt: booking.requestExpiresAt,
+      timestamp: new Date().toISOString()
+    });
+    console.log('[RequestDriver] Socket event emitted to driver:', driver._id);
+  } catch (socketError) {
+    console.error('[RequestDriver] Failed to emit socket event:', socketError.message);
+    // Don't fail the request if socket emission fails
   }
 
   // Prepare response with driver info
