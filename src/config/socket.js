@@ -43,9 +43,6 @@ const initializeSocket = (server) => {
     // Important for reverse proxies
     serveClient: false,
 
-    // WebSocket options
-    wsEngine: 'ws',
-
     // Destroy upgrade timeout
     destroyUpgrade: false,
     destroyUpgradeTimeout: 1000
