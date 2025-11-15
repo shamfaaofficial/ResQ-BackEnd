@@ -12,28 +12,76 @@ const initializeSocket = (server) => {
   io = new Server(server, {
     cors: {
       origin: process.env.CORS_ORIGIN || '*',
-      methods: ['GET', 'POST']
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      credentials: true,
+      allowedHeaders: ['Content-Type', 'Authorization']
     },
+    // Important for production deployments
+    transports: ['websocket', 'polling'],
+    allowEIO3: true,
+    upgradeTimeout: 30000,
+
+    // Timeouts
     pingTimeout: 60000,
-    pingInterval: 25000
+    pingInterval: 25000,
+
+    // Connection settings
+    connectTimeout: 45000,
+
+    // Path configuration
+    path: '/socket.io/',
+
+    // Engine.IO options
+    allowUpgrades: true,
+    perMessageDeflate: false,
+    httpCompression: true,
+    maxHttpBufferSize: 1e6,
+
+    // Cookie settings (for sticky sessions if using load balancer)
+    cookie: false,
+
+    // Important for reverse proxies
+    serveClient: false,
+
+    // WebSocket options
+    wsEngine: 'ws',
+
+    // Destroy upgrade timeout
+    destroyUpgrade: false,
+    destroyUpgradeTimeout: 1000
   });
+
+  console.log('✅ [Socket.io] Configuration:');
+  console.log(`   Transports: websocket, polling`);
+  console.log(`   CORS Origin: ${process.env.CORS_ORIGIN || '*'}`);
+  console.log(`   Path: /socket.io/`);
+  console.log(`   Allow Upgrades: true`);
+  console.log(`   Upgrade Timeout: 30000ms`);
+  console.log(`   Server Port: ${process.env.PORT || 5000}`);
 
   // Authentication middleware
   io.use(async (socket, next) => {
     const socketId = socket.id;
     const clientIp = socket.handshake.address;
+    const transport = socket.conn.transport.name;
 
     console.log(`\n🔐 [Socket Auth] New connection attempt`);
     console.log(`   Socket ID: ${socketId}`);
     console.log(`   Client IP: ${clientIp}`);
+    console.log(`   Transport: ${transport}`);
+    console.log(`   Headers:`, JSON.stringify(socket.handshake.headers, null, 2));
 
     try {
       const token = socket.handshake.auth.token;
 
       if (!token) {
         console.log(`❌ [Socket Auth] Connection rejected - No token provided (${socketId})`);
+        console.log(`   Auth object:`, JSON.stringify(socket.handshake.auth, null, 2));
         return next(new Error('Authentication token required'));
       }
+
+      console.log(`🔑 [Socket Auth] Token received, verifying...`);
+      console.log(`   Token preview: ${token.substring(0, 20)}...`);
 
       // Verify JWT token
       const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
@@ -48,20 +96,38 @@ const initializeSocket = (server) => {
       next();
     } catch (error) {
       console.log(`❌ [Socket Auth] Authentication failed - ${error.message} (${socketId})`);
+      console.log(`   Error stack:`, error.stack);
       next(new Error('Invalid authentication token'));
     }
   });
 
   // Connection handler
   io.on('connection', (socket) => {
+    const initialTransport = socket.conn.transport.name;
+
     console.log(`\n╔════════════════════════════════════════════════════════╗`);
     console.log(`║          🔌 NEW SOCKET CONNECTION                     ║`);
     console.log(`╚════════════════════════════════════════════════════════╝`);
     console.log(`   Socket ID: ${socket.id}`);
     console.log(`   User ID: ${socket.userId}`);
     console.log(`   Role: ${socket.userRole}`);
+    console.log(`   Transport: ${initialTransport}`);
     console.log(`   Connected at: ${new Date().toISOString()}`);
     console.log(`   Total Connections: ${io.engine.clientsCount}`);
+
+    // Monitor transport upgrades
+    socket.conn.on('upgrade', (transport) => {
+      console.log(`\n⬆️  [Socket Upgrade] Connection upgraded`);
+      console.log(`   Socket ID: ${socket.id}`);
+      console.log(`   From: ${initialTransport} → To: ${transport.name}`);
+      console.log(`   User: ${socket.userId} (${socket.userRole})`);
+    });
+
+    // Monitor packet events for debugging
+    socket.conn.on('packet', (packet) => {
+      if (packet.type === 'ping' || packet.type === 'pong') return; // Skip ping/pong spam
+      console.log(`📦 [Socket Packet] ${packet.type} - Socket: ${socket.id}`);
+    });
 
     // Driver joins their personal room (automatic on connection)
     if (socket.userRole === 'driver') {
