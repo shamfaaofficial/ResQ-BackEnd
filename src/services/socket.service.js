@@ -164,25 +164,62 @@ const notifyDriverArrival = (userId, bookingId, driver) => {
  */
 const emitNewBookingRequest = (driverId, bookingData) => {
   const io = getIO();
+  const timestamp = new Date().toISOString();
 
   if (!io) {
-    console.log(`⚠️  [Socket Service] Cannot emit booking request - Socket.io not initialized`);
+    console.log(`\n╔════════════════════════════════════════════════════════════════╗`);
+    console.log(`║  ❌ SOCKET.IO NOT INITIALIZED - CANNOT EMIT BOOKING          ║`);
+    console.log(`╚════════════════════════════════════════════════════════════════╝`);
     console.log(`   Target Driver: ${driverId}`);
+    console.log(`   Booking ID: ${bookingData.bookingId}`);
+    console.log(`   Timestamp: ${timestamp}`);
+    console.log(`   ⚠️ This should NEVER happen if server is running properly!`);
+    console.log(`════════════════════════════════════════════════════════════════\n`);
     return;
   }
 
-  console.log(`\n🚨🚨🚨 [Socket Service] EMITTING NEW BOOKING REQUEST TO DRIVER 🚨🚨🚨`);
-  console.log(`   Event: booking:new:request`);
+  console.log(`\n╔════════════════════════════════════════════════════════════════╗`);
+  console.log(`║  🚨🚨🚨 EMITTING NEW BOOKING REQUEST TO DRIVER 🚨🚨🚨         ║`);
+  console.log(`╚════════════════════════════════════════════════════════════════╝`);
+  console.log(`📤 Emission Details:`);
+  console.log(`   Event Name: booking:new:request`);
   console.log(`   Target Driver ID: ${driverId}`);
   console.log(`   Target Room: driver:${driverId}`);
   console.log(`   Booking ID: ${bookingData.bookingId}`);
   console.log(`   Booking Number: ${bookingData.bookingNumber}`);
-  console.log(`   Timestamp: ${new Date().toISOString()}`);
-  console.log(`   Payload:`, JSON.stringify(bookingData, null, 2));
+  console.log(`   Vehicle Type: ${bookingData.vehicleType}`);
+  console.log(`   Total Amount: ${bookingData.pricing?.total} QAR`);
+  console.log(`   ETA: ${bookingData.eta} minutes`);
+  console.log(`   User ID: ${bookingData.userId}`);
+  console.log(`   Timestamp: ${timestamp}`);
+  console.log(`\n📦 Full Payload:`);
+  console.log(JSON.stringify(bookingData, null, 2));
 
+  // Check if driver is in the room
+  const driverRoom = io.sockets.adapter.rooms.get(`driver:${driverId}`);
+  const socketsInRoom = driverRoom ? driverRoom.size : 0;
+
+  console.log(`\n🔍 Room Status Check:`);
+  console.log(`   Room: driver:${driverId}`);
+  console.log(`   Sockets in room: ${socketsInRoom}`);
+
+  if (socketsInRoom === 0) {
+    console.log(`   ⚠️⚠️⚠️ WARNING: No sockets in driver room! ⚠️⚠️⚠️`);
+    console.log(`   This means the driver is NOT connected or NOT joined the room!`);
+    console.log(`   Event will NOT be received by driver!`);
+  } else {
+    console.log(`   ✅ Driver has ${socketsInRoom} active socket(s) in room`);
+    console.log(`   Event WILL be delivered to driver`);
+  }
+
+  // Emit the event
   io.to(`driver:${driverId}`).emit('booking:new:request', bookingData);
 
-  console.log(`   ✅✅✅ BOOKING REQUEST EMITTED SUCCESSFULLY TO driver:${driverId} ✅✅✅`);
+  console.log(`\n✅✅✅ BOOKING REQUEST EMISSION COMPLETED ✅✅✅`);
+  console.log(`   Event emitted to room: driver:${driverId}`);
+  console.log(`   Number of recipients: ${socketsInRoom}`);
+  console.log(`   Timestamp: ${timestamp}`);
+  console.log(`════════════════════════════════════════════════════════════════\n`);
 };
 
 module.exports = {

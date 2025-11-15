@@ -124,6 +124,60 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Socket.IO status endpoint
+app.get('/socket-status', (req, res) => {
+  try {
+    const { getIO } = require('./config/socket');
+    const io = getIO();
+
+    if (!io) {
+      return res.status(503).json({
+        success: false,
+        message: 'Socket.IO not initialized',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Get all rooms and their socket counts
+    const rooms = {};
+    io.sockets.adapter.rooms.forEach((sockets, roomName) => {
+      // Skip individual socket IDs (they are also in rooms map)
+      if (!io.sockets.sockets.has(roomName)) {
+        rooms[roomName] = {
+          socketCount: sockets.size,
+          sockets: Array.from(sockets)
+        };
+      }
+    });
+
+    const totalConnections = io.engine.clientsCount;
+
+    res.status(200).json({
+      success: true,
+      message: 'Socket.IO is running',
+      timestamp: new Date().toISOString(),
+      stats: {
+        totalConnections: totalConnections,
+        totalRooms: Object.keys(rooms).length,
+        rooms: rooms
+      },
+      config: {
+        port: process.env.PORT || 5000,
+        path: '/socket.io/',
+        transports: ['websocket', 'polling'],
+        cors: process.env.CORS_ORIGIN || '*'
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching Socket.IO status',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // API Routes
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/user', userRoutes);

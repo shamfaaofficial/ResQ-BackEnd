@@ -51,6 +51,9 @@ const initializeSocket = (server) => {
     destroyUpgradeTimeout: 1000
   });
 
+  console.log('\n╔═══════════════════════════════════════════════════════════════╗');
+  console.log('║  🔌 SOCKET.IO SERVER INITIALIZATION                          ║');
+  console.log('╚═══════════════════════════════════════════════════════════════╝');
   console.log('✅ [Socket.io] Configuration:');
   console.log(`   Transports: websocket, polling`);
   console.log(`   CORS Origin: ${process.env.CORS_ORIGIN || '*'}`);
@@ -58,45 +61,72 @@ const initializeSocket = (server) => {
   console.log(`   Allow Upgrades: true`);
   console.log(`   Upgrade Timeout: 30000ms`);
   console.log(`   Server Port: ${process.env.PORT || 5000}`);
+  console.log(`   Node Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log('═══════════════════════════════════════════════════════════════\n');
 
   // Authentication middleware
   io.use(async (socket, next) => {
     const socketId = socket.id;
     const clientIp = socket.handshake.address;
     const transport = socket.conn.transport.name;
+    const timestamp = new Date().toISOString();
 
-    console.log(`\n🔐 [Socket Auth] New connection attempt`);
+    console.log(`\n╔═══════════════════════════════════════════════════════════════╗`);
+    console.log(`║  🔐 SOCKET AUTH ATTEMPT - ${timestamp}  ║`);
+    console.log(`╚═══════════════════════════════════════════════════════════════╝`);
+    console.log(`📊 Connection Details:`);
     console.log(`   Socket ID: ${socketId}`);
     console.log(`   Client IP: ${clientIp}`);
     console.log(`   Transport: ${transport}`);
-    console.log(`   Headers:`, JSON.stringify(socket.handshake.headers, null, 2));
+    console.log(`   URL: ${socket.handshake.url}`);
+    console.log(`   Query:`, JSON.stringify(socket.handshake.query, null, 2));
+    console.log(`\n🌐 Request Headers:`);
+    console.log(`   Host: ${socket.handshake.headers.host || 'NOT_PROVIDED'}`);
+    console.log(`   Origin: ${socket.handshake.headers.origin || 'NOT_PROVIDED'}`);
+    console.log(`   User-Agent: ${socket.handshake.headers['user-agent'] || 'NOT_PROVIDED'}`);
+    console.log(`   X-Forwarded-For: ${socket.handshake.headers['x-forwarded-for'] || 'NOT_PROVIDED'}`);
+    console.log(`   X-Real-IP: ${socket.handshake.headers['x-real-ip'] || 'NOT_PROVIDED'}`);
 
     try {
       const token = socket.handshake.auth.token;
 
       if (!token) {
-        console.log(`❌ [Socket Auth] Connection rejected - No token provided (${socketId})`);
+        console.log(`\n❌❌❌ AUTH FAILED - NO TOKEN PROVIDED ❌❌❌`);
+        console.log(`   Socket ID: ${socketId}`);
         console.log(`   Auth object:`, JSON.stringify(socket.handshake.auth, null, 2));
+        console.log(`   This means the frontend is NOT sending the JWT token!`);
+        console.log(`═══════════════════════════════════════════════════════════════\n`);
         return next(new Error('Authentication token required'));
       }
 
-      console.log(`🔑 [Socket Auth] Token received, verifying...`);
-      console.log(`   Token preview: ${token.substring(0, 20)}...`);
+      console.log(`\n🔑 Token Authentication:`);
+      console.log(`   Token received: YES`);
+      console.log(`   Token preview: ${token.substring(0, 30)}...`);
+      console.log(`   Token length: ${token.length} characters`);
+      console.log(`   Verifying token...`);
 
       // Verify JWT token
       const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
       socket.userId = decoded.userId;
       socket.userRole = decoded.role;
 
-      console.log(`✅ [Socket Auth] Token verified successfully`);
+      console.log(`\n✅✅✅ AUTH SUCCESS ✅✅✅`);
       console.log(`   User ID: ${decoded.userId}`);
       console.log(`   Role: ${decoded.role}`);
+      console.log(`   Token Issued: ${new Date(decoded.iat * 1000).toISOString()}`);
       console.log(`   Token Expiry: ${new Date(decoded.exp * 1000).toISOString()}`);
+      console.log(`   Time until expiry: ${Math.floor((decoded.exp * 1000 - Date.now()) / 1000 / 60)} minutes`);
+      console.log(`═══════════════════════════════════════════════════════════════\n`);
 
       next();
     } catch (error) {
-      console.log(`❌ [Socket Auth] Authentication failed - ${error.message} (${socketId})`);
-      console.log(`   Error stack:`, error.stack);
+      console.log(`\n❌❌❌ AUTH FAILED - TOKEN VERIFICATION ERROR ❌❌❌`);
+      console.log(`   Socket ID: ${socketId}`);
+      console.log(`   Error Type: ${error.name}`);
+      console.log(`   Error Message: ${error.message}`);
+      console.log(`   Error Stack:`);
+      console.log(error.stack);
+      console.log(`═══════════════════════════════════════════════════════════════\n`);
       next(new Error('Invalid authentication token'));
     }
   });
@@ -104,105 +134,175 @@ const initializeSocket = (server) => {
   // Connection handler
   io.on('connection', (socket) => {
     const initialTransport = socket.conn.transport.name;
+    const timestamp = new Date().toISOString();
 
-    console.log(`\n╔════════════════════════════════════════════════════════╗`);
-    console.log(`║          🔌 NEW SOCKET CONNECTION                     ║`);
-    console.log(`╚════════════════════════════════════════════════════════╝`);
+    console.log(`\n╔════════════════════════════════════════════════════════════════╗`);
+    console.log(`║  ✅ SOCKET CONNECTION ESTABLISHED - ${timestamp}  ║`);
+    console.log(`╚════════════════════════════════════════════════════════════════╝`);
+    console.log(`📊 Connection Info:`);
     console.log(`   Socket ID: ${socket.id}`);
     console.log(`   User ID: ${socket.userId}`);
-    console.log(`   Role: ${socket.userRole}`);
-    console.log(`   Transport: ${initialTransport}`);
-    console.log(`   Connected at: ${new Date().toISOString()}`);
-    console.log(`   Total Connections: ${io.engine.clientsCount}`);
+    console.log(`   Role: ${socket.userRole.toUpperCase()}`);
+    console.log(`   Transport: ${initialTransport.toUpperCase()}`);
+    console.log(`   Client IP: ${socket.handshake.address}`);
+    console.log(`   Connected at: ${timestamp}`);
+    console.log(`   Total Active Connections: ${io.engine.clientsCount}`);
+    console.log(`════════════════════════════════════════════════════════════════\n`);
 
     // Monitor transport upgrades
     socket.conn.on('upgrade', (transport) => {
-      console.log(`\n⬆️  [Socket Upgrade] Connection upgraded`);
+      console.log(`\n╔════════════════════════════════════════════════════════════════╗`);
+      console.log(`║  ⬆️  TRANSPORT UPGRADE SUCCESSFUL                             ║`);
+      console.log(`╚════════════════════════════════════════════════════════════════╝`);
       console.log(`   Socket ID: ${socket.id}`);
-      console.log(`   From: ${initialTransport} → To: ${transport.name}`);
       console.log(`   User: ${socket.userId} (${socket.userRole})`);
+      console.log(`   From: ${initialTransport.toUpperCase()} → To: ${transport.name.toUpperCase()}`);
+      console.log(`   Timestamp: ${new Date().toISOString()}`);
+      console.log(`   ✅ WebSocket connection now active!`);
+      console.log(`════════════════════════════════════════════════════════════════\n`);
     });
 
-    // Monitor packet events for debugging
+    // Monitor transport upgrade errors
+    socket.conn.on('upgradeError', (error) => {
+      console.log(`\n╔════════════════════════════════════════════════════════════════╗`);
+      console.log(`║  ❌ TRANSPORT UPGRADE FAILED                                  ║`);
+      console.log(`╚════════════════════════════════════════════════════════════════╝`);
+      console.log(`   Socket ID: ${socket.id}`);
+      console.log(`   User: ${socket.userId} (${socket.userRole})`);
+      console.log(`   Transport: ${initialTransport}`);
+      console.log(`   Error: ${error.message}`);
+      console.log(`   Timestamp: ${new Date().toISOString()}`);
+      console.log(`   ⚠️ Staying on polling transport`);
+      console.log(`════════════════════════════════════════════════════════════════\n`);
+    });
+
+    // Monitor packet events for debugging (reduced spam)
+    let packetCount = 0;
     socket.conn.on('packet', (packet) => {
       if (packet.type === 'ping' || packet.type === 'pong') return; // Skip ping/pong spam
-      console.log(`📦 [Socket Packet] ${packet.type} - Socket: ${socket.id}`);
+      packetCount++;
+      console.log(`📦 [Packet #${packetCount}] Type: ${packet.type} | Socket: ${socket.id} | User: ${socket.userId}`);
     });
 
     // Driver joins their personal room (automatic on connection)
     if (socket.userRole === 'driver') {
       socket.join(`driver:${socket.userId}`);
-      console.log(`\n🚗 [Socket Room] Driver joined personal room (auto)`);
-      console.log(`   Room: driver:${socket.userId}`);
+
+      console.log(`\n╔════════════════════════════════════════════════════════════════╗`);
+      console.log(`║  🚗 DRIVER AUTO-JOINED ROOM                                   ║`);
+      console.log(`╚════════════════════════════════════════════════════════════════╝`);
       console.log(`   Driver ID: ${socket.userId}`);
+      console.log(`   Room Name: driver:${socket.userId}`);
+      console.log(`   Socket ID: ${socket.id}`);
+      console.log(`   Timestamp: ${new Date().toISOString()}`);
 
       // Send confirmation back to driver
-      socket.emit('driver:joined', {
+      const confirmationPayload = {
         success: true,
         room: `driver:${socket.userId}`,
         socketId: socket.id,
-        userId: socket.userId
-      });
+        userId: socket.userId,
+        timestamp: new Date().toISOString()
+      };
+
+      socket.emit('driver:joined', confirmationPayload);
+
+      console.log(`   ✅ Confirmation event 'driver:joined' emitted to driver`);
+      console.log(`   Payload:`, JSON.stringify(confirmationPayload, null, 2));
+      console.log(`════════════════════════════════════════════════════════════════\n`);
     }
 
     // User joins their personal room (automatic on connection)
     if (socket.userRole === 'user') {
       socket.join(`user:${socket.userId}`);
-      console.log(`\n👤 [Socket Room] User joined personal room (auto)`);
-      console.log(`   Room: user:${socket.userId}`);
+
+      console.log(`\n╔════════════════════════════════════════════════════════════════╗`);
+      console.log(`║  👤 USER AUTO-JOINED ROOM                                     ║`);
+      console.log(`╚════════════════════════════════════════════════════════════════╝`);
       console.log(`   User ID: ${socket.userId}`);
+      console.log(`   Room Name: user:${socket.userId}`);
+      console.log(`   Socket ID: ${socket.id}`);
+      console.log(`   Timestamp: ${new Date().toISOString()}`);
 
       // Send confirmation back to user
-      socket.emit('user:joined', {
+      const confirmationPayload = {
         success: true,
         room: `user:${socket.userId}`,
         socketId: socket.id,
-        userId: socket.userId
-      });
+        userId: socket.userId,
+        timestamp: new Date().toISOString()
+      };
+
+      socket.emit('user:joined', confirmationPayload);
+
+      console.log(`   ✅ Confirmation event 'user:joined' emitted to user`);
+      console.log(`   Payload:`, JSON.stringify(confirmationPayload, null, 2));
+      console.log(`════════════════════════════════════════════════════════════════\n`);
     }
 
     // Handle explicit driver:join event (for manual room joining)
     socket.on('driver:join', async ({ driverId }) => {
-      console.log(`\n🚪 [Socket Event] driver:join received`);
+      console.log(`\n╔════════════════════════════════════════════════════════════════╗`);
+      console.log(`║  🚪 MANUAL DRIVER:JOIN EVENT RECEIVED                        ║`);
+      console.log(`╚════════════════════════════════════════════════════════════════╝`);
       console.log(`   Driver ID from event: ${driverId}`);
-      console.log(`   Socket User ID: ${socket.userId}`);
+      console.log(`   Authenticated User ID: ${socket.userId}`);
+      console.log(`   Authenticated Role: ${socket.userRole}`);
       console.log(`   Socket ID: ${socket.id}`);
+      console.log(`   Timestamp: ${new Date().toISOString()}`);
 
       // Verify the driverId matches the authenticated user
       if (socket.userRole !== 'driver') {
-        console.log(`❌ [Socket] Join failed - User is not a driver (role: ${socket.userRole})`);
+        console.log(`\n❌❌❌ MANUAL JOIN FAILED - NOT A DRIVER ❌❌❌`);
+        console.log(`   User Role: ${socket.userRole}`);
+        console.log(`   Only drivers can join driver rooms`);
+        console.log(`════════════════════════════════════════════════════════════════\n`);
+
         socket.emit('driver:join:error', {
           success: false,
-          message: 'Only drivers can join driver rooms'
+          message: 'Only drivers can join driver rooms',
+          timestamp: new Date().toISOString()
         });
         return;
       }
 
       if (driverId !== socket.userId.toString()) {
-        console.log(`❌ [Socket] Join failed - Driver ID mismatch (requested: ${driverId}, authenticated: ${socket.userId})`);
+        console.log(`\n❌❌❌ MANUAL JOIN FAILED - ID MISMATCH ❌❌❌`);
+        console.log(`   Requested Driver ID: ${driverId}`);
+        console.log(`   Authenticated User ID: ${socket.userId}`);
+        console.log(`   Security violation: Driver trying to join another driver's room`);
+        console.log(`════════════════════════════════════════════════════════════════\n`);
+
         socket.emit('driver:join:error', {
           success: false,
-          message: 'Driver ID does not match authenticated user'
+          message: 'Driver ID does not match authenticated user',
+          timestamp: new Date().toISOString()
         });
         return;
       }
 
-      // Join the driver to their room
+      // Join the driver to their room (they should already be joined, but ensuring it)
       await socket.join(`driver:${driverId}`);
 
-      console.log(`✅ [Socket Room] Driver ${driverId} joined room successfully (manual join)`);
+      console.log(`\n✅✅✅ MANUAL DRIVER JOIN SUCCESSFUL ✅✅✅`);
+      console.log(`   Driver ID: ${driverId}`);
       console.log(`   Room: driver:${driverId}`);
       console.log(`   Socket ID: ${socket.id}`);
 
       // Send confirmation back to driver
-      socket.emit('driver:joined', {
+      const confirmationPayload = {
         success: true,
         room: `driver:${driverId}`,
         socketId: socket.id,
-        userId: driverId
-      });
+        userId: driverId,
+        timestamp: new Date().toISOString()
+      };
 
-      console.log(`✅✅✅ DRIVER ROOM JOINED CONFIRMATION SENT ✅✅✅`);
+      socket.emit('driver:joined', confirmationPayload);
+
+      console.log(`   ✅ Confirmation event 'driver:joined' emitted`);
+      console.log(`   Payload:`, JSON.stringify(confirmationPayload, null, 2));
+      console.log(`════════════════════════════════════════════════════════════════\n`);
     });
 
     // Driver sends real-time location during active trip
