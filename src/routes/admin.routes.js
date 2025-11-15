@@ -4,7 +4,6 @@ const adminUserController = require('../controllers/admin.user.controller');
 const adminDriverController = require('../controllers/admin.driver.controller');
 const adminTripController = require('../controllers/admin.trip.controller');
 const adminDashboardController = require('../controllers/admin.dashboard.controller');
-const adminDocumentController = require('../controllers/admin.document.controller');
 const { authMiddleware, roleMiddleware } = require('../middlewares/auth');
 
 // All admin routes require authentication and admin role
@@ -101,30 +100,5 @@ router.patch('/trips/:tripId/cancel', adminTripController.cancelTrip);
 
 // Update trip status (force update)
 router.patch('/trips/:tripId/status', adminTripController.updateTripStatus);
-
-/**
- * DRIVER DOCUMENT MANAGEMENT ROUTES
- */
-
-// Get all drivers with their documents (with filters)
-router.get('/drivers/documents', adminDocumentController.getAllDriverDocuments);
-
-// Get drivers with pending documents (needs review)
-router.get('/drivers/documents/pending', adminDocumentController.getPendingDocuments);
-
-// Bulk update multiple documents
-router.patch('/drivers/documents/bulk-update', adminDocumentController.bulkUpdateDocuments);
-
-// Get specific driver's documents
-router.get('/drivers/:driverId/documents', adminDocumentController.getDriverDocuments);
-
-// Approve/Reject a specific document
-router.patch('/drivers/:driverId/documents/:documentId', adminDocumentController.updateDocumentStatus);
-
-// Approve driver application (approve all documents and activate account)
-router.post('/drivers/:driverId/approve', adminDocumentController.approveDriverApplication);
-
-// Reject driver application and delete account
-router.delete('/drivers/:driverId/reject', adminDocumentController.rejectDriverApplication);
 
 module.exports = router;
