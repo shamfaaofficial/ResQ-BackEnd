@@ -63,21 +63,81 @@ const initializeSocket = (server) => {
     console.log(`   Connected at: ${new Date().toISOString()}`);
     console.log(`   Total Connections: ${io.engine.clientsCount}`);
 
-    // Driver joins their personal room
+    // Driver joins their personal room (automatic on connection)
     if (socket.userRole === 'driver') {
       socket.join(`driver:${socket.userId}`);
-      console.log(`\n🚗 [Socket Room] Driver joined personal room`);
+      console.log(`\n🚗 [Socket Room] Driver joined personal room (auto)`);
       console.log(`   Room: driver:${socket.userId}`);
       console.log(`   Driver ID: ${socket.userId}`);
+
+      // Send confirmation back to driver
+      socket.emit('driver:joined', {
+        success: true,
+        room: `driver:${socket.userId}`,
+        socketId: socket.id,
+        userId: socket.userId
+      });
     }
 
-    // User joins their personal room
+    // User joins their personal room (automatic on connection)
     if (socket.userRole === 'user') {
       socket.join(`user:${socket.userId}`);
-      console.log(`\n👤 [Socket Room] User joined personal room`);
+      console.log(`\n👤 [Socket Room] User joined personal room (auto)`);
       console.log(`   Room: user:${socket.userId}`);
       console.log(`   User ID: ${socket.userId}`);
+
+      // Send confirmation back to user
+      socket.emit('user:joined', {
+        success: true,
+        room: `user:${socket.userId}`,
+        socketId: socket.id,
+        userId: socket.userId
+      });
     }
+
+    // Handle explicit driver:join event (for manual room joining)
+    socket.on('driver:join', async ({ driverId }) => {
+      console.log(`\n🚪 [Socket Event] driver:join received`);
+      console.log(`   Driver ID from event: ${driverId}`);
+      console.log(`   Socket User ID: ${socket.userId}`);
+      console.log(`   Socket ID: ${socket.id}`);
+
+      // Verify the driverId matches the authenticated user
+      if (socket.userRole !== 'driver') {
+        console.log(`❌ [Socket] Join failed - User is not a driver (role: ${socket.userRole})`);
+        socket.emit('driver:join:error', {
+          success: false,
+          message: 'Only drivers can join driver rooms'
+        });
+        return;
+      }
+
+      if (driverId !== socket.userId.toString()) {
+        console.log(`❌ [Socket] Join failed - Driver ID mismatch (requested: ${driverId}, authenticated: ${socket.userId})`);
+        socket.emit('driver:join:error', {
+          success: false,
+          message: 'Driver ID does not match authenticated user'
+        });
+        return;
+      }
+
+      // Join the driver to their room
+      await socket.join(`driver:${driverId}`);
+
+      console.log(`✅ [Socket Room] Driver ${driverId} joined room successfully (manual join)`);
+      console.log(`   Room: driver:${driverId}`);
+      console.log(`   Socket ID: ${socket.id}`);
+
+      // Send confirmation back to driver
+      socket.emit('driver:joined', {
+        success: true,
+        room: `driver:${driverId}`,
+        socketId: socket.id,
+        userId: driverId
+      });
+
+      console.log(`✅✅✅ DRIVER ROOM JOINED CONFIRMATION SENT ✅✅✅`);
+    });
 
     // Driver sends real-time location during active trip
     socket.on('driver:location:update', async (data) => {

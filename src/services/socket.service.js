@@ -42,6 +42,34 @@ const emitToUser = (userId, event, data) => {
 };
 
 /**
+ * Emit event to specific driver
+ * @param {String} driverId - Driver ID
+ * @param {String} event - Event name
+ * @param {Object} data - Event data
+ */
+const emitToDriver = (driverId, event, data) => {
+  const io = getIO();
+
+  if (!io) {
+    console.log(`⚠️  [Socket Service] Cannot emit - Socket.io not initialized`);
+    console.log(`   Target Driver: ${driverId}`);
+    console.log(`   Event: ${event}`);
+    return;
+  }
+
+  console.log(`\n📤 [Socket Service] Emitting event to driver`);
+  console.log(`   Event: ${event}`);
+  console.log(`   Target Driver ID: ${driverId}`);
+  console.log(`   Target Room: driver:${driverId}`);
+  console.log(`   Timestamp: ${new Date().toISOString()}`);
+  console.log(`   Payload:`, JSON.stringify(data, null, 2));
+
+  io.to(`driver:${driverId}`).emit(event, data);
+
+  console.log(`   ✅ Event emitted successfully to driver room`);
+};
+
+/**
  * Emit event to specific booking room
  * @param {String} bookingId - Booking ID
  * @param {String} event - Event name
@@ -129,12 +157,42 @@ const notifyDriverArrival = (userId, bookingId, driver) => {
   });
 };
 
+/**
+ * Emit new booking request to driver
+ * @param {String} driverId - Driver ID
+ * @param {Object} bookingData - Booking data
+ */
+const emitNewBookingRequest = (driverId, bookingData) => {
+  const io = getIO();
+
+  if (!io) {
+    console.log(`⚠️  [Socket Service] Cannot emit booking request - Socket.io not initialized`);
+    console.log(`   Target Driver: ${driverId}`);
+    return;
+  }
+
+  console.log(`\n🚨🚨🚨 [Socket Service] EMITTING NEW BOOKING REQUEST TO DRIVER 🚨🚨🚨`);
+  console.log(`   Event: booking:new:request`);
+  console.log(`   Target Driver ID: ${driverId}`);
+  console.log(`   Target Room: driver:${driverId}`);
+  console.log(`   Booking ID: ${bookingData.bookingId}`);
+  console.log(`   Booking Number: ${bookingData.bookingNumber}`);
+  console.log(`   Timestamp: ${new Date().toISOString()}`);
+  console.log(`   Payload:`, JSON.stringify(bookingData, null, 2));
+
+  io.to(`driver:${driverId}`).emit('booking:new:request', bookingData);
+
+  console.log(`   ✅✅✅ BOOKING REQUEST EMITTED SUCCESSFULLY TO driver:${driverId} ✅✅✅`);
+};
+
 module.exports = {
   getIO,
   emitToUser,
+  emitToDriver,
   emitToBooking,
   notifyBookingStatusChange,
   notifyDriverBookingUpdate,
   broadcastDriverLocation,
   notifyDriverArrival,
+  emitNewBookingRequest,
 };
