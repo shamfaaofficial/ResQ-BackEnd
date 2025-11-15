@@ -43,44 +43,52 @@ const driverSchema = new mongoose.Schema({
       type: String
     }]
   },
-  documents: {
-    drivingLicense: {
-      url: String,
-      status: {
-        type: String,
-        enum: Object.values(DOCUMENT_STATUS),
-        default: DOCUMENT_STATUS.PENDING
-      },
-      rejectionReason: String
+  documents: [{
+    type: {
+      type: String,
+      enum: ['license', 'registration', 'insurance', 'vehicle_photo', 'profile_photo', 'national_id', 'other'],
+      required: true
     },
-    vehicleRegistration: {
-      url: String,
-      status: {
-        type: String,
-        enum: Object.values(DOCUMENT_STATUS),
-        default: DOCUMENT_STATUS.PENDING
-      },
-      rejectionReason: String
+    url: {
+      type: String,
+      required: true
     },
-    insurance: {
-      url: String,
-      status: {
-        type: String,
-        enum: Object.values(DOCUMENT_STATUS),
-        default: DOCUMENT_STATUS.PENDING
-      },
-      rejectionReason: String
+    status: {
+      type: String,
+      enum: Object.values(DOCUMENT_STATUS),
+      default: DOCUMENT_STATUS.PENDING
     },
-    nationalId: {
-      url: String,
-      status: {
-        type: String,
-        enum: Object.values(DOCUMENT_STATUS),
-        default: DOCUMENT_STATUS.PENDING
-      },
-      rejectionReason: String
+    uploadedAt: {
+      type: Date,
+      default: Date.now
+    },
+    verifiedAt: {
+      type: Date
+    },
+    rejectionReason: {
+      type: String
+    },
+    adminComments: {
+      type: String,
+      trim: true
+    },
+    reviewedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    reviewedAt: {
+      type: Date
+    },
+    fileName: {
+      type: String
+    },
+    fileSize: {
+      type: Number
+    },
+    mimeType: {
+      type: String
     }
-  },
+  }],
   approvalStatus: {
     type: String,
     enum: Object.values(APPROVAL_STATUS),
@@ -91,6 +99,14 @@ const driverSchema = new mongoose.Schema({
   },
   rejectionReason: {
     type: String
+  },
+  adminComments: {
+    type: String,
+    trim: true
+  },
+  reviewedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   },
   isOnline: {
     type: Boolean,

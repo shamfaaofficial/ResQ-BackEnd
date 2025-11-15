@@ -2,8 +2,27 @@ const express = require('express');
 const router = express.Router();
 const driverController = require('../controllers/driver.controller');
 const authController = require('../controllers/auth.controller');
+const driverDocumentController = require('../controllers/driver.document.controller');
 const { authMiddleware, roleMiddleware } = require('../middlewares/auth');
 const { locationUpdateLimiter } = require('../middlewares/rateLimiter');
+const multer = require('multer');
+
+// Configure multer for memory storage (files will be uploaded to S3)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Accept images and PDFs only
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only JPEG, PNG, and PDF files are allowed.'));
+    }
+  }
+});
 
 // All routes are protected and require driver role
 
@@ -70,6 +89,43 @@ router.patch(
   authMiddleware,
   roleMiddleware('driver'),
   driverController.updateBankDetails
+);
+
+/**
+ * DOCUMENT UPLOAD ROUTES
+ */
+
+// Get document requirements
+router.get(
+  '/documents/requirements',
+  authMiddleware,
+  roleMiddleware('driver'),
+  driverDocumentController.getDocumentRequirements
+);
+
+// Get my documents
+router.get(
+  '/documents',
+  authMiddleware,
+  roleMiddleware('driver'),
+  driverDocumentController.getMyDocuments
+);
+
+// Upload document to S3
+router.post(
+  '/documents/upload',
+  authMiddleware,
+  roleMiddleware('driver'),
+  upload.single('document'), // 'document' is the form field name
+  driverDocumentController.uploadDocument
+);
+
+// Delete document
+router.delete(
+  '/documents/:documentType',
+  authMiddleware,
+  roleMiddleware('driver'),
+  driverDocumentController.deleteDocument
 );
 
 module.exports = router;

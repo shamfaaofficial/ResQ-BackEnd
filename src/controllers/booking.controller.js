@@ -1502,7 +1502,9 @@ exports.requestSpecificDriver = asyncHandler(async (req, res) => {
     };
 
     // Emit to driver using the dedicated service function
-    emitNewBookingRequest(driver._id.toString(), bookingPayload);
+    // Use driver.userId._id (User ID) not driver._id (Driver document ID)
+    // because socket rooms use pattern: driver:${userId}
+    emitNewBookingRequest(driver.userId._id.toString(), bookingPayload);
   } catch (socketError) {
     console.error('[RequestDriver] Failed to emit socket event:', socketError.message);
     // Don't fail the request if socket emission fails
