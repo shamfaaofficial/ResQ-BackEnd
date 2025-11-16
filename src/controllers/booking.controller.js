@@ -272,6 +272,20 @@ exports.createBooking = asyncHandler(async (req, res) => {
 
 // Get user's active booking
 exports.getUserActiveBooking = asyncHandler(async (req, res) => {
+  console.log('\n========== GET USER ACTIVE BOOKING ==========');
+  console.log('[GetUserActiveBooking] User ID:', req.userId);
+  console.log('[GetUserActiveBooking] Timestamp:', new Date().toISOString());
+
+  // First, let's see ALL bookings for this user to debug
+  const allUserBookings = await Booking.find({ userId: req.userId })
+    .select('bookingNumber status payment.status createdAt')
+    .sort({ createdAt: -1 })
+    .limit(5)
+    .lean();
+
+  console.log('[GetUserActiveBooking] Last 5 bookings for this user:');
+  console.log(JSON.stringify(allUserBookings, null, 2));
+
   const booking = await Booking.findOne({
     userId: req.userId,
     status: {
@@ -290,6 +304,22 @@ exports.getUserActiveBooking = asyncHandler(async (req, res) => {
     populate: { path: 'userId', select: 'phoneNumber profile' }
   })
   .sort({ createdAt: -1 });
+
+  if (booking) {
+    console.log('[GetUserActiveBooking] ✅ Found active booking:', booking.bookingNumber);
+    console.log('[GetUserActiveBooking] Booking status:', booking.status);
+    console.log('[GetUserActiveBooking] Payment status:', booking.payment?.status);
+  } else {
+    console.log('[GetUserActiveBooking] ❌ No active booking found');
+    console.log('[GetUserActiveBooking] Query statuses:', [
+      BOOKING_STATUS.REQUESTED,
+      BOOKING_STATUS.ACCEPTED,
+      BOOKING_STATUS.DRIVER_ARRIVED,
+      BOOKING_STATUS.IN_PROGRESS,
+      BOOKING_STATUS.PAYMENT_COMPLETED
+    ]);
+  }
+  console.log('========== END GET USER ACTIVE BOOKING ==========\n');
 
   res.status(200).json({
     success: true,
@@ -812,25 +842,46 @@ exports.acceptBooking = asyncHandler(async (req, res) => {
     throw new NotFoundError('Driver profile not found');
   }
 
-  // Find booking
-  const booking = await Booking.findById(bookingId);
-  if (!booking) {
-    throw new NotFoundError('Booking not found');
-  }
+  // Use findOneAndUpdate with atomic update to prevent race conditions
+  const booking = await Booking.findOneAndUpdate(
+    {
+      _id: bookingId,
+      status: BOOKING_STATUS.REQUESTED,
+      driverId: null
+    },
+    {
+      $set: {
+        status: BOOKING_STATUS.ACCEPTED,
+        driverId: driver._id,
+        'timeline.acceptedAt': new Date()
+      }
+    },
+    { new: true }
+  );
 
-  // Check if booking is still available
-  if (booking.status !== BOOKING_STATUS.REQUESTED) {
-    throw new ValidationError('Booking is no longer available');
+  // If booking not found or already accepted by another driver
+  if (!booking) {
+    const existingBooking = await Booking.findById(bookingId);
+    if (!existingBooking) {
+      throw new NotFoundError('Booking not found');
+    }
+    if (existingBooking.status !== BOOKING_STATUS.REQUESTED) {
+      throw new ValidationError('Booking is no longer available');
+    }
+    if (existingBooking.driverId) {
+      throw new ValidationError('Booking has already been accepted by another driver');
+    }
+    throw new ValidationError('Unable to accept booking');
   }
 
   if (booking.isExpired()) {
+    // Revert the acceptance
+    booking.status = BOOKING_STATUS.REQUESTED;
+    booking.driverId = null;
+    booking.timeline.acceptedAt = null;
+    await booking.save();
     throw new ValidationError('Booking request has expired');
   }
-
-  // Accept booking
-  booking.status = BOOKING_STATUS.ACCEPTED;
-  booking.driverId = driver._id;
-  booking.timeline.acceptedAt = new Date();
 
   // Set payment expiry after acceptance (user should pay within 5 minutes)
   booking.paymentExpiresAt = new Date(Date.now() + PAYMENT_TIMEOUT_SECONDS * 1000);
