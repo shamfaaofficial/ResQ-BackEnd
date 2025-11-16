@@ -25,36 +25,6 @@ exports.getDocumentRequirements = asyncHandler(async (req, res) => {
         description: 'Valid vehicle registration document',
         acceptedFormats: ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'],
         maxSize: '5MB'
-      },
-      {
-        type: 'insurance',
-        name: 'Vehicle Insurance',
-        description: 'Valid vehicle insurance certificate',
-        acceptedFormats: ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'],
-        maxSize: '5MB'
-      },
-      {
-        type: 'national_id',
-        name: 'National ID / QID',
-        description: 'Qatar ID or National ID card',
-        acceptedFormats: ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'],
-        maxSize: '5MB'
-      }
-    ],
-    optional: [
-      {
-        type: 'vehicle_photo',
-        name: 'Vehicle Photo',
-        description: 'Clear photo of your tow truck',
-        acceptedFormats: ['image/jpeg', 'image/jpg', 'image/png'],
-        maxSize: '5MB'
-      },
-      {
-        type: 'profile_photo',
-        name: 'Profile Photo',
-        description: 'Your profile photo',
-        acceptedFormats: ['image/jpeg', 'image/jpg', 'image/png'],
-        maxSize: '5MB'
       }
     ]
   };
@@ -139,10 +109,10 @@ exports.uploadDocument = asyncHandler(async (req, res) => {
   const driverId = req.user.userId;
   const { documentType } = req.body;
 
-  // Validate document type
-  const validTypes = ['license', 'registration', 'insurance', 'vehicle_photo', 'profile_photo', 'national_id', 'other'];
+  // Validate document type - only license and registration are required
+  const validTypes = ['license', 'registration'];
   if (!documentType || !validTypes.includes(documentType)) {
-    throw new ValidationError('Invalid document type');
+    throw new ValidationError('Invalid document type. Only "license" and "registration" are allowed');
   }
 
   // Check if file was uploaded
