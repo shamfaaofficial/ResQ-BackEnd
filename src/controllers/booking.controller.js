@@ -835,12 +835,18 @@ exports.getBookingDetailsById = asyncHandler(async (req, res) => {
 exports.acceptBooking = asyncHandler(async (req, res) => {
   const { bookingId } = req.params;
 
+  console.log('\n========== ACCEPT BOOKING REQUEST ==========');
+  console.log('[AcceptBooking] Booking ID:', bookingId);
+  console.log('[AcceptBooking] Driver User ID:', req.userId);
+
   // Get driver profile
   const driver = await Driver.findOne({ userId: req.userId })
     .populate('userId', 'phoneNumber profile');
   if (!driver) {
     throw new NotFoundError('Driver profile not found');
   }
+
+  console.log('[AcceptBooking] Driver found:', driver._id);
 
   // Use findOneAndUpdate with atomic update to prevent race conditions
   const booking = await Booking.findOneAndUpdate(
@@ -861,18 +867,27 @@ exports.acceptBooking = asyncHandler(async (req, res) => {
 
   // If booking not found or already accepted by another driver
   if (!booking) {
+    console.log('[AcceptBooking] ❌ Atomic update failed - booking not found or already accepted');
     const existingBooking = await Booking.findById(bookingId);
     if (!existingBooking) {
+      console.log('[AcceptBooking] ❌ Booking does not exist');
       throw new NotFoundError('Booking not found');
     }
+    console.log('[AcceptBooking] Existing booking status:', existingBooking.status);
+    console.log('[AcceptBooking] Existing booking driverId:', existingBooking.driverId);
+
     if (existingBooking.status !== BOOKING_STATUS.REQUESTED) {
+      console.log('[AcceptBooking] ❌ Booking status is not REQUESTED');
       throw new ValidationError('Booking is no longer available');
     }
     if (existingBooking.driverId) {
+      console.log('[AcceptBooking] ❌ Booking already has a driver assigned');
       throw new ValidationError('Booking has already been accepted by another driver');
     }
     throw new ValidationError('Unable to accept booking');
   }
+
+  console.log('[AcceptBooking] ✅ Booking accepted successfully');
 
   if (booking.isExpired()) {
     // Revert the acceptance
@@ -890,6 +905,7 @@ exports.acceptBooking = asyncHandler(async (req, res) => {
   // AUTO-COMPLETE PAYMENT (TEMPORARY - FOR DEVELOPMENT/TESTING)
   // TODO: Remove this in production - payment should come from user
   // ============================================================
+  console.log('[AcceptBooking] Auto-completing payment for development...');
   booking.status = BOOKING_STATUS.PAYMENT_COMPLETED;
   booking.timeline.paymentCompletedAt = new Date();
   booking.payment = {
@@ -902,6 +918,10 @@ exports.acceptBooking = asyncHandler(async (req, res) => {
   };
 
   await booking.save();
+  console.log('[AcceptBooking] ✅ Booking saved with status:', booking.status);
+  console.log('[AcceptBooking] ✅ Payment status:', booking.payment.status);
+  console.log('[AcceptBooking] ✅ Booking ID:', booking._id);
+  console.log('[AcceptBooking] ✅ Driver ID:', booking.driverId);
 
   await booking.populate('userId', 'phoneNumber profile fcmToken');
 
