@@ -81,11 +81,11 @@ exports.userVerifyOTP = asyncHandler(async (req, res) => {
 
 // Complete user signup after OTP verification
 exports.userCompleteSignup = asyncHandler(async (req, res) => {
-  const { phoneNumber, password } = req.body;
+  const { phoneNumber, password, firstName, lastName } = req.body;
 
   // Validate required fields
-  if (!phoneNumber || !password) {
-    throw new ValidationError('Phone number and password are required');
+  if (!phoneNumber || !password || !firstName) {
+    throw new ValidationError('Phone number, password, and first name are required');
   }
 
   // Check if user already exists
@@ -103,7 +103,11 @@ exports.userCompleteSignup = asyncHandler(async (req, res) => {
     password: hashedPassword,
     role: 'user',
     isVerified: true,
-    isActive: true
+    isActive: true,
+    profile: {
+      firstName,
+      lastName: lastName || ''
+    }
   });
 
   // Generate tokens
@@ -121,7 +125,9 @@ exports.userCompleteSignup = asyncHandler(async (req, res) => {
       user: {
         id: user._id,
         phoneNumber: user.phoneNumber,
-        role: user.role
+        role: user.role,
+        firstName: user.profile.firstName,
+        lastName: user.profile.lastName
       },
       accessToken,
       refreshToken
@@ -343,11 +349,11 @@ exports.driverVerifyOTP = asyncHandler(async (req, res) => {
 
 // Complete driver signup after OTP verification
 exports.driverCompleteSignup = asyncHandler(async (req, res) => {
-  const { phoneNumber, password } = req.body;
+  const { phoneNumber, password, firstName, lastName } = req.body;
 
   // Validate required fields
-  if (!phoneNumber || !password) {
-    throw new ValidationError('Phone number and password are required');
+  if (!phoneNumber || !password || !firstName) {
+    throw new ValidationError('Phone number, password, and first name are required');
   }
 
   // Check if user already exists
@@ -365,7 +371,11 @@ exports.driverCompleteSignup = asyncHandler(async (req, res) => {
     password: hashedPassword,
     role: 'driver',
     isVerified: true,
-    isActive: true
+    isActive: true,
+    profile: {
+      firstName,
+      lastName: lastName || ''
+    }
   });
 
   // Create driver profile linked to user
@@ -389,7 +399,9 @@ exports.driverCompleteSignup = asyncHandler(async (req, res) => {
       user: {
         id: user._id,
         phoneNumber: user.phoneNumber,
-        role: user.role
+        role: user.role,
+        firstName: user.profile.firstName,
+        lastName: user.profile.lastName
       },
       driver: {
         id: driver._id,
