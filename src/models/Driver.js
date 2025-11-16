@@ -46,12 +46,10 @@ const driverSchema = new mongoose.Schema({
   documents: [{
     type: {
       type: String,
-      enum: ['license', 'registration', 'insurance', 'vehicle_photo', 'profile_photo', 'national_id', 'other'],
-      required: true
+      enum: ['license', 'registration', 'insurance', 'vehicle_photo', 'profile_photo', 'national_id', 'other']
     },
     url: {
-      type: String,
-      required: true
+      type: String
     },
     status: {
       type: String,
