@@ -849,7 +849,7 @@ exports.acceptBooking = asyncHandler(async (req, res) => {
   console.log('[AcceptBooking] Driver found:', driver._id);
 
   // Use findOneAndUpdate with atomic update to prevent race conditions
-  const booking = await Booking.findOneAndUpdate(
+  let booking = await Booking.findOneAndUpdate(
     {
       _id: bookingId,
       status: BOOKING_STATUS.REQUESTED,
@@ -881,10 +881,21 @@ exports.acceptBooking = asyncHandler(async (req, res) => {
       throw new ValidationError('Booking is no longer available');
     }
     if (existingBooking.driverId) {
-      console.log('[AcceptBooking] ❌ Booking already has a driver assigned');
-      throw new ValidationError('Booking has already been accepted by another driver');
+      // Check if it's the SAME driver retrying
+      if (existingBooking.driverId.toString() === driver._id.toString()) {
+        console.log('[AcceptBooking] ⚠️ Same driver retrying - recovering from partial acceptance');
+        // Allow the same driver to complete the acceptance (recovery mode)
+        // Continue with the existing booking
+        booking = existingBooking;
+      } else {
+        console.log('[AcceptBooking] ❌ Booking already has a DIFFERENT driver assigned');
+        throw new ValidationError('Booking has already been accepted by another driver');
+      }
     }
-    throw new ValidationError('Unable to accept booking');
+
+    if (!booking) {
+      throw new ValidationError('Unable to accept booking');
+    }
   }
 
   console.log('[AcceptBooking] ✅ Booking accepted successfully');
@@ -896,6 +907,14 @@ exports.acceptBooking = asyncHandler(async (req, res) => {
     booking.timeline.acceptedAt = null;
     await booking.save();
     throw new ValidationError('Booking request has expired');
+  }
+
+  // Ensure booking has correct status and timeline (handles both new acceptance and recovery)
+  if (booking.status === BOOKING_STATUS.REQUESTED) {
+    console.log('[AcceptBooking] Updating booking status from REQUESTED to ACCEPTED');
+    booking.status = BOOKING_STATUS.ACCEPTED;
+    booking.driverId = driver._id;
+    booking.timeline.acceptedAt = booking.timeline.acceptedAt || new Date();
   }
 
   // Set payment expiry after acceptance (user should pay within 5 minutes)
