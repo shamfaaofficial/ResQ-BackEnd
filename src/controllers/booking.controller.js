@@ -936,6 +936,15 @@ exports.acceptBooking = asyncHandler(async (req, res) => {
     gatewayResponse: { note: 'Auto-completed for testing' }
   };
 
+  // Generate 4-digit verification code immediately (for user to see in advance)
+  const verificationCode = Math.floor(1000 + Math.random() * 9000).toString();
+  booking.verificationCode = {
+    code: verificationCode,
+    generatedAt: new Date(),
+    isVerified: false
+  };
+  console.log('[AcceptBooking] ✅ Verification code generated:', verificationCode);
+
   await booking.save();
   console.log('[AcceptBooking] ✅ Booking saved with status:', booking.status);
   console.log('[AcceptBooking] ✅ Payment status:', booking.payment.status);
@@ -950,12 +959,18 @@ exports.acceptBooking = asyncHandler(async (req, res) => {
     : driver.userId?.phoneNumber || 'Driver';
 
   try {
-    await notificationService.notifyBookingAccepted(
+    await notificationService.sendNotification(
       booking.userId._id,
-      booking._id,
-      driverName
+      'Booking Accepted',
+      `${driverName} accepted your booking! Your verification code: ${verificationCode}`,
+      'booking_accepted',
+      {
+        bookingId: booking._id,
+        driverId: driver._id,
+        verificationCode: verificationCode
+      }
     );
-    console.log('[AcceptBooking] Booking acceptance notification sent to user');
+    console.log('[AcceptBooking] Booking acceptance notification sent to user with verification code');
   } catch (notifError) {
     console.error('[AcceptBooking] Failed to send notification to user:', notifError.message);
     // Don't fail the booking acceptance if notification fails
@@ -1042,14 +1057,20 @@ exports.markDriverArrived = asyncHandler(async (req, res) => {
     throw new ValidationError('Payment must be completed before driver can mark arrival');
   }
 
-  // Generate 4-digit verification code
-  const verificationCode = Math.floor(1000 + Math.random() * 9000).toString();
-
-  booking.verificationCode = {
-    code: verificationCode,
-    generatedAt: new Date(),
-    isVerified: false
-  };
+  // Use existing verification code or generate a new one if it doesn't exist
+  let verificationCode;
+  if (booking.verificationCode && booking.verificationCode.code) {
+    verificationCode = booking.verificationCode.code;
+    console.log('[MarkDriverArrived] Using existing verification code:', verificationCode);
+  } else {
+    verificationCode = Math.floor(1000 + Math.random() * 9000).toString();
+    booking.verificationCode = {
+      code: verificationCode,
+      generatedAt: new Date(),
+      isVerified: false
+    };
+    console.log('[MarkDriverArrived] Generated new verification code:', verificationCode);
+  }
 
   booking.status = BOOKING_STATUS.DRIVER_ARRIVED;
   booking.timeline.driverArrivedAt = new Date();
