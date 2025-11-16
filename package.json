@@ -20,6 +20,9 @@
   "author": "RESQ Team",
   "license": "MIT",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.932.0",
+    "@aws-sdk/lib-storage": "^3.932.0",
+    "@aws-sdk/s3-request-presigner": "^3.932.0",
     "axios": "^1.13.1",
     "bcryptjs": "^3.0.2",
     "cloudinary": "^2.8.0",
@@ -36,6 +39,7 @@
     "mongoose": "^8.19.2",
     "morgan": "^1.10.1",
     "multer": "^2.0.2",
+    "multer-s3": "^3.0.1",
     "node-cron": "^4.2.1",
     "rate-limit-redis": "^4.2.3",
     "redis": "^5.9.0",

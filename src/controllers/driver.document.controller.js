@@ -2,160 +2,231 @@ const asyncHandler = require('express-async-handler');
 const Driver = require('../models/Driver');
 const { uploadToS3, deleteFromS3, getSignedFileUrl, extractS3Key } = require('../config/s3');
 const { ValidationError, NotFoundError } = require('../utils/errors');
-const { DOCUMENT_TYPES, DOCUMENT_STATUS } = require('../config/constants');
+const path = require('path');
 
 /**
- * Upload driver document to S3
- * POST /api/v1/driver/documents/upload
+ * Get document requirements/types
+ * GET /api/v1/driver/documents/requirements
+ * @access Private (Driver only)
  */
-exports.uploadDocument = asyncHandler(async (req, res) => {
-  const driverId = req.user.userId; // From auth middleware
-  const { documentType } = req.body;
-
-  // Validate document type
-  const validDocTypes = ['license', 'registration', 'insurance', 'vehicle_photo', 'profile_photo', 'other'];
-  if (!documentType || !validDocTypes.includes(documentType)) {
-    throw new ValidationError(`Invalid document type. Must be one of: ${validDocTypes.join(', ')}`);
-  }
-
-  // Check if file was uploaded
-  if (!req.file) {
-    throw new ValidationError('No file uploaded. Please provide a file.');
-  }
-
-  // Find driver
-  const driver = await Driver.findOne({ userId: driverId });
-  if (!driver) {
-    throw new NotFoundError('Driver not found');
-  }
-
-  try {
-    // Generate S3 file path: drivers/{driverId}/{documentType}_{timestamp}.{ext}
-    const fileExtension = req.file.originalname.split('.').pop();
-    const timestamp = Date.now();
-    const s3FileName = `drivers/${driver._id}/${documentType}_${timestamp}.${fileExtension}`;
-
-    // Upload to S3
-    const s3Url = await uploadToS3(
-      req.file.buffer,
-      s3FileName,
-      req.file.mimetype
-    );
-
-    // If there's an existing document of this type, delete the old one from S3
-    const existingDoc = driver.documents.find(doc => doc.type === documentType);
-    if (existingDoc && existingDoc.url) {
-      try {
-        const oldKey = extractS3Key(existingDoc.url);
-        await deleteFromS3(oldKey);
-        console.log(`🗑️  [Document] Deleted old document from S3: ${oldKey}`);
-      } catch (error) {
-        console.error(`⚠️  [Document] Failed to delete old document:`, error.message);
-        // Continue even if delete fails
+exports.getDocumentRequirements = asyncHandler(async (req, res) => {
+  const requirements = {
+    required: [
+      {
+        type: 'license',
+        name: 'Driver License',
+        description: 'Valid driver license',
+        acceptedFormats: ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'],
+        maxSize: '5MB'
+      },
+      {
+        type: 'registration',
+        name: 'Vehicle Registration',
+        description: 'Valid vehicle registration document',
+        acceptedFormats: ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'],
+        maxSize: '5MB'
+      },
+      {
+        type: 'insurance',
+        name: 'Vehicle Insurance',
+        description: 'Valid vehicle insurance certificate',
+        acceptedFormats: ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'],
+        maxSize: '5MB'
+      },
+      {
+        type: 'national_id',
+        name: 'National ID / QID',
+        description: 'Qatar ID or National ID card',
+        acceptedFormats: ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'],
+        maxSize: '5MB'
       }
-    }
-
-    // Update or add document in driver's documents array
-    const documentIndex = driver.documents.findIndex(doc => doc.type === documentType);
-
-    const documentData = {
-      type: documentType,
-      url: s3Url,
-      uploadedAt: new Date(),
-      status: 'pending', // Admin needs to verify
-      fileName: req.file.originalname,
-      fileSize: req.file.size,
-      mimeType: req.file.mimetype
-    };
-
-    if (documentIndex >= 0) {
-      // Update existing document
-      driver.documents[documentIndex] = {
-        ...driver.documents[documentIndex],
-        ...documentData
-      };
-    } else {
-      // Add new document
-      driver.documents.push(documentData);
-    }
-
-    await driver.save();
-
-    console.log(`✅ [Document] Uploaded successfully: ${documentType} for driver ${driver._id}`);
-
-    res.status(200).json({
-      success: true,
-      message: 'Document uploaded successfully',
-      data: {
-        documentType,
-        url: s3Url,
-        status: 'pending',
-        uploadedAt: documentData.uploadedAt
+    ],
+    optional: [
+      {
+        type: 'vehicle_photo',
+        name: 'Vehicle Photo',
+        description: 'Clear photo of your tow truck',
+        acceptedFormats: ['image/jpeg', 'image/jpg', 'image/png'],
+        maxSize: '5MB'
+      },
+      {
+        type: 'profile_photo',
+        name: 'Profile Photo',
+        description: 'Your profile photo',
+        acceptedFormats: ['image/jpeg', 'image/jpg', 'image/png'],
+        maxSize: '5MB'
       }
-    });
-  } catch (error) {
-    console.error(`❌ [Document] Upload failed:`, error);
-    throw new Error(`Document upload failed: ${error.message}`);
-  }
+    ]
+  };
+
+  res.json({
+    success: true,
+    data: requirements
+  });
 });
 
 /**
- * Get all documents for logged-in driver
+ * Get driver's own documents
  * GET /api/v1/driver/documents
+ * @access Private (Driver only)
  */
 exports.getMyDocuments = asyncHandler(async (req, res) => {
   const driverId = req.user.userId;
 
-  const driver = await Driver.findOne({ userId: driverId }).select('documents');
+  const driver = await Driver.findOne({ userId: driverId })
+    .select('documents approvalStatus adminComments reviewedBy reviewedAt')
+    .populate('reviewedBy', 'profile.firstName profile.lastName');
+
   if (!driver) {
-    throw new NotFoundError('Driver not found');
+    throw new NotFoundError('Driver profile not found');
   }
 
-  // Generate signed URLs for private documents
+  // Generate signed URLs for all documents
   const documentsWithSignedUrls = await Promise.all(
     driver.documents.map(async (doc) => {
-      try {
-        const key = extractS3Key(doc.url);
-        const signedUrl = await getSignedFileUrl(key, 3600); // 1 hour expiry
-
-        return {
-          _id: doc._id,
-          type: doc.type,
-          url: signedUrl, // Temporary signed URL
-          status: doc.status,
-          uploadedAt: doc.uploadedAt,
-          verifiedAt: doc.verifiedAt,
-          rejectionReason: doc.rejectionReason,
-          fileName: doc.fileName,
-          fileSize: doc.fileSize,
-          mimeType: doc.mimeType
-        };
-      } catch (error) {
-        console.error(`⚠️  [Document] Failed to generate signed URL:`, error.message);
-        return {
-          _id: doc._id,
-          type: doc.type,
-          url: null,
-          status: doc.status,
-          uploadedAt: doc.uploadedAt,
-          error: 'Failed to generate download URL'
-        };
+      let signedUrl = null;
+      if (doc.url) {
+        try {
+          const s3Key = extractS3Key(doc.url);
+          signedUrl = await getSignedFileUrl(s3Key, 3600); // 1 hour expiry
+        } catch (error) {
+          console.error(`Failed to generate signed URL for ${doc.url}:`, error);
+        }
       }
+
+      return {
+        id: doc._id,
+        type: doc.type,
+        url: doc.url,
+        signedUrl, // Temporary access URL (expires in 1 hour)
+        status: doc.status,
+        uploadedAt: doc.uploadedAt,
+        verifiedAt: doc.verifiedAt,
+        rejectionReason: doc.rejectionReason,
+        adminComments: doc.adminComments,
+        reviewedBy: doc.reviewedBy ? {
+          id: doc.reviewedBy._id,
+          name: `${doc.reviewedBy.profile?.firstName || ''} ${doc.reviewedBy.profile?.lastName || ''}`.trim()
+        } : null,
+        reviewedAt: doc.reviewedAt,
+        fileName: doc.fileName,
+        fileSize: doc.fileSize,
+        mimeType: doc.mimeType
+      };
     })
   );
 
-  res.status(200).json({
+  res.json({
     success: true,
     data: {
       documents: documentsWithSignedUrls,
-      totalDocuments: driver.documents.length
+      approvalStatus: driver.approvalStatus,
+      adminComments: driver.adminComments,
+      reviewedBy: driver.reviewedBy ? {
+        id: driver.reviewedBy._id,
+        name: `${driver.reviewedBy.profile?.firstName || ''} ${driver.reviewedBy.profile?.lastName || ''}`.trim()
+      } : null
     }
   });
 });
 
 /**
- * Delete a document
+ * Upload document to S3
+ * POST /api/v1/driver/documents/upload
+ * @access Private (Driver only)
+ */
+exports.uploadDocument = asyncHandler(async (req, res) => {
+  const driverId = req.user.userId;
+  const { documentType } = req.body;
+
+  // Validate document type
+  const validTypes = ['license', 'registration', 'insurance', 'vehicle_photo', 'profile_photo', 'national_id', 'other'];
+  if (!documentType || !validTypes.includes(documentType)) {
+    throw new ValidationError('Invalid document type');
+  }
+
+  // Check if file was uploaded
+  if (!req.file) {
+    throw new ValidationError('No file uploaded');
+  }
+
+  // Get driver
+  const driver = await Driver.findOne({ userId: driverId });
+  if (!driver) {
+    throw new NotFoundError('Driver profile not found');
+  }
+
+  // Generate unique filename
+  const fileExtension = path.extname(req.file.originalname);
+  const s3FileName = `drivers/${driver._id}/${documentType}_${Date.now()}${fileExtension}`;
+
+  // Upload to S3
+  const s3Url = await uploadToS3(req.file.buffer, s3FileName, req.file.mimetype);
+
+  // Check if document type already exists
+  const existingDocIndex = driver.documents.findIndex(doc => doc.type === documentType);
+
+  if (existingDocIndex !== -1) {
+    // Delete old file from S3
+    try {
+      const oldS3Key = extractS3Key(driver.documents[existingDocIndex].url);
+      await deleteFromS3(oldS3Key);
+    } catch (error) {
+      console.error('Failed to delete old S3 file:', error);
+      // Continue even if deletion fails
+    }
+
+    // Update existing document
+    driver.documents[existingDocIndex] = {
+      type: documentType,
+      url: s3Url,
+      uploadedAt: new Date(),
+      status: 'pending',
+      fileName: req.file.originalname,
+      fileSize: req.file.size,
+      mimeType: req.file.mimetype,
+      // Clear previous review data
+      verifiedAt: undefined,
+      rejectionReason: undefined,
+      adminComments: undefined,
+      reviewedBy: undefined,
+      reviewedAt: undefined
+    };
+  } else {
+    // Add new document
+    driver.documents.push({
+      type: documentType,
+      url: s3Url,
+      uploadedAt: new Date(),
+      status: 'pending',
+      fileName: req.file.originalname,
+      fileSize: req.file.size,
+      mimeType: req.file.mimetype
+    });
+  }
+
+  await driver.save();
+
+  // Generate signed URL for response
+  const signedUrl = await getSignedFileUrl(s3FileName, 3600);
+
+  res.status(201).json({
+    success: true,
+    message: 'Document uploaded successfully',
+    data: {
+      type: documentType,
+      url: s3Url,
+      signedUrl,
+      uploadedAt: new Date(),
+      status: 'pending'
+    }
+  });
+});
+
+/**
+ * Delete document
  * DELETE /api/v1/driver/documents/:documentType
+ * @access Private (Driver only)
  */
 exports.deleteDocument = asyncHandler(async (req, res) => {
   const driverId = req.user.userId;
@@ -163,105 +234,30 @@ exports.deleteDocument = asyncHandler(async (req, res) => {
 
   const driver = await Driver.findOne({ userId: driverId });
   if (!driver) {
-    throw new NotFoundError('Driver not found');
+    throw new NotFoundError('Driver profile not found');
   }
 
-  // Find the document
+  // Find document
   const docIndex = driver.documents.findIndex(doc => doc.type === documentType);
   if (docIndex === -1) {
-    throw new NotFoundError(`Document of type '${documentType}' not found`);
+    throw new NotFoundError('Document not found');
   }
-
-  const document = driver.documents[docIndex];
 
   // Delete from S3
   try {
-    const s3Key = extractS3Key(document.url);
+    const s3Key = extractS3Key(driver.documents[docIndex].url);
     await deleteFromS3(s3Key);
-    console.log(`🗑️  [Document] Deleted from S3: ${s3Key}`);
   } catch (error) {
-    console.error(`⚠️  [Document] S3 deletion failed:`, error.message);
-    // Continue to remove from database even if S3 delete fails
+    console.error('Failed to delete S3 file:', error);
+    // Continue to remove from database even if S3 deletion fails
   }
 
-  // Remove from driver documents array
+  // Remove from driver's documents array
   driver.documents.splice(docIndex, 1);
   await driver.save();
 
-  console.log(`✅ [Document] Deleted successfully: ${documentType} for driver ${driver._id}`);
-
-  res.status(200).json({
+  res.json({
     success: true,
     message: 'Document deleted successfully'
   });
 });
-
-/**
- * Get document upload requirements/info
- * GET /api/v1/driver/documents/requirements
- */
-exports.getDocumentRequirements = asyncHandler(async (req, res) => {
-  const requirements = {
-    requiredDocuments: [
-      {
-        type: 'license',
-        name: 'Driver\'s License',
-        description: 'Valid driver\'s license (front and back)',
-        required: true,
-        formats: ['image/jpeg', 'image/png', 'application/pdf'],
-        maxSize: '5MB'
-      },
-      {
-        type: 'registration',
-        name: 'Vehicle Registration',
-        description: 'Vehicle registration certificate',
-        required: true,
-        formats: ['image/jpeg', 'image/png', 'application/pdf'],
-        maxSize: '5MB'
-      },
-      {
-        type: 'insurance',
-        name: 'Insurance Certificate',
-        description: 'Valid vehicle insurance certificate',
-        required: true,
-        formats: ['image/jpeg', 'image/png', 'application/pdf'],
-        maxSize: '5MB'
-      },
-      {
-        type: 'vehicle_photo',
-        name: 'Vehicle Photo',
-        description: 'Clear photo of your tow truck',
-        required: true,
-        formats: ['image/jpeg', 'image/png'],
-        maxSize: '5MB'
-      },
-      {
-        type: 'profile_photo',
-        name: 'Profile Photo',
-        description: 'Professional profile photo',
-        required: false,
-        formats: ['image/jpeg', 'image/png'],
-        maxSize: '2MB'
-      }
-    ],
-    guidelines: [
-      'All documents must be clear and readable',
-      'Documents must be current and not expired',
-      'Photos should be well-lit with no glare',
-      'Accepted formats: JPEG, PNG, PDF',
-      'Maximum file size: 5MB per document'
-    ]
-  };
-
-  res.status(200).json({
-    success: true,
-    data: requirements
-  });
-});
-
-module.exports = {
-  uploadDocument,
-  getMyDocuments,
-  deleteDocument,
-  getDocumentRequirements
-};

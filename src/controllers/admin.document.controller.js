@@ -1,222 +1,261 @@
 const asyncHandler = require('express-async-handler');
 const Driver = require('../models/Driver');
-const { getSignedFileUrl, extractS3Key } = require('../config/s3');
+const User = require('../models/User');
+const { deleteFromS3, getSignedFileUrl, extractS3Key } = require('../config/s3');
 const { ValidationError, NotFoundError } = require('../utils/errors');
-const { DOCUMENT_STATUS } = require('../config/constants');
+const { APPROVAL_STATUS, DOCUMENT_STATUS } = require('../config/constants');
 
 /**
- * ADMIN - Get all drivers with their documents
+ * Get all drivers with their documents
  * GET /api/v1/admin/drivers/documents
+ * @access Private (Admin only)
+ * Query params: status (pending/approved/rejected), page, limit
  */
 exports.getAllDriverDocuments = asyncHandler(async (req, res) => {
-  const {
-    page = 1,
-    limit = 10,
-    documentStatus, // Filter by document status (pending, approved, rejected)
-    approvalStatus, // Filter by driver approval status
-    search
-  } = req.query;
+  const { status, page = 1, limit = 10 } = req.query;
+  const skip = (page - 1) * limit;
 
-  // Build query
   const query = {};
-
-  // Filter by driver approval status
-  if (approvalStatus) {
-    query.approvalStatus = approvalStatus;
+  if (status) {
+    query.approvalStatus = status;
   }
 
-  // Filter by document status (check if any document has this status)
-  if (documentStatus) {
-    query['documents.status'] = documentStatus;
-  }
-
-  // Get drivers with populated user info
-  let drivers = await Driver.find(query)
-    .populate({
-      path: 'userId',
-      select: 'phoneNumber profile username'
-    })
-    .select('userId documents approvalStatus vehicleDetails createdAt')
+  const drivers = await Driver.find(query)
+    .populate('userId', 'phoneNumber profile')
+    .populate('reviewedBy', 'profile.firstName profile.lastName')
+    .select('documents approvalStatus adminComments reviewedBy createdAt')
     .sort({ createdAt: -1 })
-    .limit(parseInt(limit))
-    .skip((parseInt(page) - 1) * parseInt(limit))
-    .lean();
+    .skip(skip)
+    .limit(parseInt(limit));
 
-  // Search by phone number or name if provided
-  if (search) {
-    drivers = drivers.filter(driver => {
-      const phoneMatch = driver.userId?.phoneNumber?.includes(search);
-      const nameMatch = driver.userId?.profile?.firstName?.toLowerCase().includes(search.toLowerCase()) ||
-                       driver.userId?.profile?.lastName?.toLowerCase().includes(search.toLowerCase());
-      return phoneMatch || nameMatch;
-    });
-  }
+  const total = await Driver.countDocuments(query);
 
-  // Generate signed URLs for all documents
+  // Generate signed URLs for documents
   const driversWithSignedUrls = await Promise.all(
     drivers.map(async (driver) => {
       const documentsWithUrls = await Promise.all(
-        (driver.documents || []).map(async (doc) => {
-          try {
-            const key = extractS3Key(doc.url);
-            const signedUrl = await getSignedFileUrl(key, 3600); // 1 hour
-
-            return {
-              ...doc,
-              url: signedUrl
-            };
-          } catch (error) {
-            console.error(`⚠️  [Admin] Failed to generate signed URL for driver ${driver._id}:`, error.message);
-            return {
-              ...doc,
-              url: null,
-              error: 'Failed to generate download URL'
-            };
+        driver.documents.map(async (doc) => {
+          let signedUrl = null;
+          if (doc.url) {
+            try {
+              const s3Key = extractS3Key(doc.url);
+              signedUrl = await getSignedFileUrl(s3Key, 3600);
+            } catch (error) {
+              console.error(`Failed to generate signed URL: ${error}`);
+            }
           }
+
+          return {
+            id: doc._id,
+            type: doc.type,
+            url: doc.url,
+            signedUrl,
+            status: doc.status,
+            uploadedAt: doc.uploadedAt,
+            verifiedAt: doc.verifiedAt,
+            rejectionReason: doc.rejectionReason,
+            adminComments: doc.adminComments,
+            reviewedBy: doc.reviewedBy,
+            reviewedAt: doc.reviewedAt
+          };
         })
       );
 
       return {
-        _id: driver._id,
-        driver: {
-          phoneNumber: driver.userId?.phoneNumber,
-          name: driver.userId?.profile?.firstName && driver.userId?.profile?.lastName
-            ? `${driver.userId.profile.firstName} ${driver.userId.profile.lastName}`
-            : driver.userId?.username || 'N/A'
-        },
+        driverId: driver._id,
+        userId: driver.userId._id,
+        phoneNumber: driver.userId.phoneNumber,
+        name: `${driver.userId.profile?.firstName || ''} ${driver.userId.profile?.lastName || ''}`.trim(),
         documents: documentsWithUrls,
         approvalStatus: driver.approvalStatus,
-        vehicleType: driver.vehicleDetails?.vehicleType,
-        totalDocuments: documentsWithUrls.length,
-        pendingDocuments: documentsWithUrls.filter(d => d.status === 'pending').length,
-        approvedDocuments: documentsWithUrls.filter(d => d.status === 'approved').length,
-        rejectedDocuments: documentsWithUrls.filter(d => d.status === 'rejected').length,
+        adminComments: driver.adminComments,
+        reviewedBy: driver.reviewedBy,
         createdAt: driver.createdAt
       };
     })
   );
 
-  // Get total count for pagination
-  const totalDrivers = await Driver.countDocuments(query);
-
-  res.status(200).json({
+  res.json({
     success: true,
     data: {
       drivers: driversWithSignedUrls,
       pagination: {
         currentPage: parseInt(page),
-        totalPages: Math.ceil(totalDrivers / parseInt(limit)),
-        totalDrivers,
-        perPage: parseInt(limit)
+        totalPages: Math.ceil(total / limit),
+        totalDocuments: total,
+        limit: parseInt(limit)
       }
     }
   });
 });
 
 /**
- * ADMIN - Get specific driver's documents
+ * Get drivers with pending documents (needs review)
+ * GET /api/v1/admin/drivers/documents/pending
+ * @access Private (Admin only)
+ */
+exports.getPendingDocuments = asyncHandler(async (req, res) => {
+  const drivers = await Driver.find({
+    $or: [
+      { approvalStatus: APPROVAL_STATUS.PENDING },
+      { 'documents.status': DOCUMENT_STATUS.PENDING }
+    ]
+  })
+    .populate('userId', 'phoneNumber profile')
+    .select('documents approvalStatus createdAt')
+    .sort({ createdAt: -1 });
+
+  // Generate signed URLs and filter only pending documents
+  const driversWithPendingDocs = await Promise.all(
+    drivers.map(async (driver) => {
+      const pendingDocs = await Promise.all(
+        driver.documents
+          .filter(doc => doc.status === DOCUMENT_STATUS.PENDING)
+          .map(async (doc) => {
+            let signedUrl = null;
+            if (doc.url) {
+              try {
+                const s3Key = extractS3Key(doc.url);
+                signedUrl = await getSignedFileUrl(s3Key, 3600);
+              } catch (error) {
+                console.error(`Failed to generate signed URL: ${error}`);
+              }
+            }
+
+            return {
+              id: doc._id,
+              type: doc.type,
+              url: doc.url,
+              signedUrl,
+              status: doc.status,
+              uploadedAt: doc.uploadedAt
+            };
+          })
+      );
+
+      return {
+        driverId: driver._id,
+        userId: driver.userId._id,
+        phoneNumber: driver.userId.phoneNumber,
+        name: `${driver.userId.profile?.firstName || ''} ${driver.userId.profile?.lastName || ''}`.trim(),
+        pendingDocuments: pendingDocs,
+        approvalStatus: driver.approvalStatus,
+        createdAt: driver.createdAt
+      };
+    })
+  );
+
+  // Filter out drivers with no pending documents
+  const filteredDrivers = driversWithPendingDocs.filter(
+    driver => driver.pendingDocuments.length > 0
+  );
+
+  res.json({
+    success: true,
+    data: {
+      totalDrivers: filteredDrivers.length,
+      drivers: filteredDrivers
+    }
+  });
+});
+
+/**
+ * Get specific driver's documents
  * GET /api/v1/admin/drivers/:driverId/documents
+ * @access Private (Admin only)
  */
 exports.getDriverDocuments = asyncHandler(async (req, res) => {
   const { driverId } = req.params;
 
   const driver = await Driver.findById(driverId)
-    .populate({
-      path: 'userId',
-      select: 'phoneNumber profile username email'
-    })
-    .select('userId documents approvalStatus vehicleDetails createdAt updatedAt')
-    .lean();
+    .populate('userId', 'phoneNumber profile')
+    .populate('reviewedBy', 'profile.firstName profile.lastName')
+    .select('documents approvalStatus adminComments reviewedBy createdAt');
 
   if (!driver) {
     throw new NotFoundError('Driver not found');
   }
 
-  // Generate signed URLs for documents
+  // Generate signed URLs
   const documentsWithSignedUrls = await Promise.all(
-    (driver.documents || []).map(async (doc) => {
-      try {
-        const key = extractS3Key(doc.url);
-        const signedUrl = await getSignedFileUrl(key, 3600); // 1 hour expiry
-
-        return {
-          _id: doc._id,
-          type: doc.type,
-          url: signedUrl,
-          status: doc.status,
-          uploadedAt: doc.uploadedAt,
-          verifiedAt: doc.verifiedAt,
-          rejectionReason: doc.rejectionReason,
-          fileName: doc.fileName,
-          fileSize: doc.fileSize,
-          mimeType: doc.mimeType
-        };
-      } catch (error) {
-        console.error(`⚠️  [Admin] Failed to generate signed URL:`, error.message);
-        return {
-          _id: doc._id,
-          type: doc.type,
-          url: null,
-          status: doc.status,
-          error: 'Failed to generate download URL'
-        };
+    driver.documents.map(async (doc) => {
+      let signedUrl = null;
+      if (doc.url) {
+        try {
+          const s3Key = extractS3Key(doc.url);
+          signedUrl = await getSignedFileUrl(s3Key, 3600);
+        } catch (error) {
+          console.error(`Failed to generate signed URL: ${error}`);
+        }
       }
+
+      return {
+        id: doc._id,
+        type: doc.type,
+        url: doc.url,
+        signedUrl,
+        status: doc.status,
+        uploadedAt: doc.uploadedAt,
+        verifiedAt: doc.verifiedAt,
+        rejectionReason: doc.rejectionReason,
+        adminComments: doc.adminComments,
+        reviewedBy: doc.reviewedBy ? {
+          id: doc.reviewedBy._id,
+          name: `${doc.reviewedBy.profile?.firstName || ''} ${doc.reviewedBy.profile?.lastName || ''}`.trim()
+        } : null,
+        reviewedAt: doc.reviewedAt,
+        fileName: doc.fileName,
+        fileSize: doc.fileSize,
+        mimeType: doc.mimeType
+      };
     })
   );
 
-  res.status(200).json({
+  res.json({
     success: true,
     data: {
       driverId: driver._id,
-      driver: {
-        phoneNumber: driver.userId?.phoneNumber,
-        email: driver.userId?.email,
-        name: driver.userId?.profile?.firstName && driver.userId?.profile?.lastName
-          ? `${driver.userId.profile.firstName} ${driver.userId.profile.lastName}`
-          : driver.userId?.username || 'N/A',
-        username: driver.userId?.username
-      },
-      approvalStatus: driver.approvalStatus,
-      vehicleDetails: driver.vehicleDetails,
+      userId: driver.userId._id,
+      phoneNumber: driver.userId.phoneNumber,
+      name: `${driver.userId.profile?.firstName || ''} ${driver.userId.profile?.lastName || ''}`.trim(),
       documents: documentsWithSignedUrls,
-      documentsSummary: {
-        total: documentsWithSignedUrls.length,
-        pending: documentsWithSignedUrls.filter(d => d.status === 'pending').length,
-        approved: documentsWithSignedUrls.filter(d => d.status === 'approved').length,
-        rejected: documentsWithSignedUrls.filter(d => d.status === 'rejected').length
-      },
-      createdAt: driver.createdAt,
-      updatedAt: driver.updatedAt
+      approvalStatus: driver.approvalStatus,
+      adminComments: driver.adminComments,
+      reviewedBy: driver.reviewedBy ? {
+        id: driver.reviewedBy._id,
+        name: `${driver.reviewedBy.profile?.firstName || ''} ${driver.reviewedBy.profile?.lastName || ''}`.trim()
+      } : null,
+      createdAt: driver.createdAt
     }
   });
 });
 
 /**
- * ADMIN - Approve/Reject a specific document
+ * Update document status (approve/reject individual document)
  * PATCH /api/v1/admin/drivers/:driverId/documents/:documentId
+ * @access Private (Admin only)
  */
 exports.updateDocumentStatus = asyncHandler(async (req, res) => {
   const { driverId, documentId } = req.params;
   const { status, rejectionReason, adminComments } = req.body;
-  const adminId = req.user.userId; // From auth middleware
+  const adminId = req.user.userId;
 
   // Validate status
-  const validStatuses = Object.values(DOCUMENT_STATUS);
-  if (!status || !validStatuses.includes(status)) {
-    throw new ValidationError(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
+  if (!status || !['approved', 'rejected', 'pending'].includes(status)) {
+    throw new ValidationError('Invalid status. Must be: approved, rejected, or pending');
   }
 
-  // If rejecting, rejection reason is required
+  // Rejection reason required for rejected status
   if (status === 'rejected' && !rejectionReason) {
     throw new ValidationError('Rejection reason is required when rejecting a document');
   }
 
-  const driver = await Driver.findById(driverId).populate('userId', 'phoneNumber profile');
+  const driver = await Driver.findById(driverId);
   if (!driver) {
     throw new NotFoundError('Driver not found');
   }
 
-  // Find the document
+  // Find document
   const document = driver.documents.id(documentId);
   if (!document) {
     throw new NotFoundError('Document not found');
@@ -233,7 +272,7 @@ exports.updateDocumentStatus = asyncHandler(async (req, res) => {
 
   if (status === 'approved') {
     document.verifiedAt = new Date();
-    document.rejectionReason = undefined; // Clear rejection reason if previously rejected
+    document.rejectionReason = undefined;
   } else if (status === 'rejected') {
     document.rejectionReason = rejectionReason;
     document.verifiedAt = undefined;
@@ -241,290 +280,89 @@ exports.updateDocumentStatus = asyncHandler(async (req, res) => {
 
   await driver.save();
 
-  // Check if all required documents are approved
-  const requiredDocTypes = ['license', 'registration', 'insurance'];
-  const hasAllRequired = requiredDocTypes.every(type =>
-    driver.documents.some(doc => doc.type === type && doc.status === 'approved')
-  );
-
-  // Auto-approve driver if all required documents are approved
-  if (hasAllRequired && driver.approvalStatus === 'pending') {
-    driver.approvalStatus = 'approved';
-    driver.approvalDate = new Date();
-    await driver.save();
-
-    console.log(`✅ [Admin] Driver ${driverId} auto-approved - all required documents verified`);
-  }
-
-  console.log(`✅ [Admin] Document ${documentId} status updated to: ${status}`);
-
-  res.status(200).json({
+  res.json({
     success: true,
     message: `Document ${status} successfully`,
     data: {
       documentId: document._id,
-      documentType: document.type,
+      type: document.type,
       status: document.status,
-      verifiedAt: document.verifiedAt,
+      adminComments: document.adminComments,
       rejectionReason: document.rejectionReason,
-      driverApprovalStatus: driver.approvalStatus
+      reviewedAt: document.reviewedAt
     }
   });
 });
 
 /**
- * ADMIN - Get drivers with pending documents (needs review)
- * GET /api/v1/admin/drivers/documents/pending
- */
-exports.getPendingDocuments = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 10 } = req.query;
-
-  // Find drivers with pending documents
-  const drivers = await Driver.find({
-    'documents.status': 'pending'
-  })
-    .populate({
-      path: 'userId',
-      select: 'phoneNumber profile username'
-    })
-    .select('userId documents approvalStatus vehicleDetails createdAt')
-    .sort({ createdAt: -1 })
-    .limit(parseInt(limit))
-    .skip((parseInt(page) - 1) * parseInt(limit))
-    .lean();
-
-  // Generate signed URLs and filter to only pending documents
-  const driversWithPendingDocs = await Promise.all(
-    drivers.map(async (driver) => {
-      const pendingDocuments = driver.documents.filter(doc => doc.status === 'pending');
-
-      const documentsWithUrls = await Promise.all(
-        pendingDocuments.map(async (doc) => {
-          try {
-            const key = extractS3Key(doc.url);
-            const signedUrl = await getSignedFileUrl(key, 3600);
-
-            return {
-              _id: doc._id,
-              type: doc.type,
-              url: signedUrl,
-              status: doc.status,
-              uploadedAt: doc.uploadedAt,
-              fileName: doc.fileName,
-              fileSize: doc.fileSize,
-              mimeType: doc.mimeType
-            };
-          } catch (error) {
-            return {
-              _id: doc._id,
-              type: doc.type,
-              url: null,
-              status: doc.status,
-              error: 'Failed to generate download URL'
-            };
-          }
-        })
-      );
-
-      return {
-        _id: driver._id,
-        driver: {
-          phoneNumber: driver.userId?.phoneNumber,
-          name: driver.userId?.profile?.firstName && driver.userId?.profile?.lastName
-            ? `${driver.userId.profile.firstName} ${driver.userId.profile.lastName}`
-            : driver.userId?.username || 'N/A'
-        },
-        pendingDocuments: documentsWithUrls,
-        totalPendingDocuments: documentsWithUrls.length,
-        approvalStatus: driver.approvalStatus,
-        vehicleType: driver.vehicleDetails?.vehicleType,
-        createdAt: driver.createdAt
-      };
-    })
-  );
-
-  const totalCount = await Driver.countDocuments({
-    'documents.status': 'pending'
-  });
-
-  res.status(200).json({
-    success: true,
-    data: {
-      drivers: driversWithPendingDocs,
-      pagination: {
-        currentPage: parseInt(page),
-        totalPages: Math.ceil(totalCount / parseInt(limit)),
-        totalDrivers: totalCount,
-        perPage: parseInt(limit)
-      }
-    }
-  });
-});
-
-/**
- * ADMIN - Bulk approve/reject multiple documents
+ * Bulk update multiple documents
  * PATCH /api/v1/admin/drivers/documents/bulk-update
+ * @access Private (Admin only)
  */
 exports.bulkUpdateDocuments = asyncHandler(async (req, res) => {
-  const { updates } = req.body;
+  const { updates } = req.body; // Array of { driverId, documentId, status, rejectionReason, adminComments }
+  const adminId = req.user.userId;
 
-  // Validate input
-  if (!Array.isArray(updates) || updates.length === 0) {
-    throw new ValidationError('Updates array is required and must not be empty');
+  if (!updates || !Array.isArray(updates) || updates.length === 0) {
+    throw new ValidationError('Updates array is required');
   }
-
-  // Validate each update
-  updates.forEach((update, index) => {
-    if (!update.driverId || !update.documentId || !update.status) {
-      throw new ValidationError(`Update at index ${index} is missing required fields (driverId, documentId, status)`);
-    }
-  });
 
   const results = [];
 
   for (const update of updates) {
     try {
-      const { driverId, documentId, status, rejectionReason } = update;
+      const { driverId, documentId, status, rejectionReason, adminComments } = update;
 
       const driver = await Driver.findById(driverId);
       if (!driver) {
-        results.push({
-          driverId,
-          documentId,
-          success: false,
-          error: 'Driver not found'
-        });
+        results.push({ driverId, documentId, success: false, error: 'Driver not found' });
         continue;
       }
 
       const document = driver.documents.id(documentId);
       if (!document) {
-        results.push({
-          driverId,
-          documentId,
-          success: false,
-          error: 'Document not found'
-        });
+        results.push({ driverId, documentId, success: false, error: 'Document not found' });
         continue;
       }
 
-      // Update status
       document.status = status;
+      document.reviewedBy = adminId;
+      document.reviewedAt = new Date();
+
+      if (adminComments) {
+        document.adminComments = adminComments;
+      }
 
       if (status === 'approved') {
         document.verifiedAt = new Date();
-        document.rejectionReason = undefined;
-      } else if (status === 'rejected' && rejectionReason) {
+      } else if (status === 'rejected') {
         document.rejectionReason = rejectionReason;
-        document.verifiedAt = undefined;
       }
 
       await driver.save();
 
-      results.push({
-        driverId,
-        documentId,
-        documentType: document.type,
-        success: true,
-        status: document.status
-      });
-
+      results.push({ driverId, documentId, success: true, status: document.status });
     } catch (error) {
-      results.push({
-        driverId: update.driverId,
-        documentId: update.documentId,
-        success: false,
-        error: error.message
-      });
+      results.push({ driverId: update.driverId, documentId: update.documentId, success: false, error: error.message });
     }
   }
 
-  const successCount = results.filter(r => r.success).length;
-  const failureCount = results.filter(r => !r.success).length;
-
-  res.status(200).json({
+  res.json({
     success: true,
-    message: `Bulk update completed: ${successCount} succeeded, ${failureCount} failed`,
+    message: 'Bulk update completed',
     data: {
-      results,
-      summary: {
-        total: results.length,
-        succeeded: successCount,
-        failed: failureCount
-      }
+      total: updates.length,
+      successful: results.filter(r => r.success).length,
+      failed: results.filter(r => !r.success).length,
+      results
     }
   });
 });
 
 /**
- * ADMIN - Reject driver application and delete account
- * DELETE /api/v1/admin/drivers/:driverId/reject
- */
-exports.rejectDriverApplication = asyncHandler(async (req, res) => {
-  const { driverId } = req.params;
-  const { rejectionReason, adminComments } = req.body;
-  const adminId = req.user.userId;
-  const User = require('../models/User');
-  const { deleteFromS3, extractS3Key } = require('../config/s3');
-
-  if (!rejectionReason) {
-    throw new ValidationError('Rejection reason is required');
-  }
-
-  const driver = await Driver.findById(driverId).populate('userId');
-  if (!driver) {
-    throw new NotFoundError('Driver not found');
-  }
-
-  const userId = driver.userId._id;
-  const phoneNumber = driver.userId.phoneNumber;
-
-  console.log(`🗑️  [Admin] Rejecting driver application: ${driverId}`);
-  console.log(`   Phone: ${phoneNumber}`);
-  console.log(`   Reason: ${rejectionReason}`);
-
-  // Delete all uploaded documents from S3
-  if (driver.documents && driver.documents.length > 0) {
-    console.log(`   Deleting ${driver.documents.length} document(s) from S3...`);
-
-    for (const doc of driver.documents) {
-      try {
-        const s3Key = extractS3Key(doc.url);
-        await deleteFromS3(s3Key);
-        console.log(`   ✅ Deleted: ${s3Key}`);
-      } catch (error) {
-        console.error(`   ⚠️  Failed to delete: ${doc.url} - ${error.message}`);
-        // Continue even if S3 delete fails
-      }
-    }
-  }
-
-  // Delete Driver document
-  await Driver.findByIdAndDelete(driverId);
-  console.log(`   ✅ Driver document deleted`);
-
-  // Delete User document
-  await User.findByIdAndDelete(userId);
-  console.log(`   ✅ User account deleted`);
-
-  console.log(`✅ [Admin] Driver application rejected and account deleted`);
-
-  res.status(200).json({
-    success: true,
-    message: 'Driver application rejected and account deleted successfully',
-    data: {
-      driverId,
-      phoneNumber,
-      rejectionReason,
-      adminComments,
-      deletedAt: new Date()
-    }
-  });
-});
-
-/**
- * ADMIN - Approve driver (mark all documents as approved and activate account)
+ * Approve driver application (approve all documents and activate account)
  * POST /api/v1/admin/drivers/:driverId/approve
+ * @access Private (Admin only)
  */
 exports.approveDriverApplication = asyncHandler(async (req, res) => {
   const { driverId } = req.params;
@@ -536,37 +374,18 @@ exports.approveDriverApplication = asyncHandler(async (req, res) => {
     throw new NotFoundError('Driver not found');
   }
 
-  // Check if driver already approved
-  if (driver.approvalStatus === 'approved') {
-    return res.status(400).json({
-      success: false,
-      error: 'Driver is already approved'
-    });
-  }
-
-  // Check if all required documents are uploaded
-  const requiredDocTypes = ['license', 'registration', 'insurance'];
-  const uploadedDocTypes = driver.documents.map(doc => doc.type);
-
-  const missingDocs = requiredDocTypes.filter(type => !uploadedDocTypes.includes(type));
-
-  if (missingDocs.length > 0) {
-    throw new ValidationError(`Cannot approve driver. Missing required documents: ${missingDocs.join(', ')}`);
-  }
-
   // Approve all documents
   driver.documents.forEach(doc => {
-    if (doc.status !== 'approved') {
-      doc.status = 'approved';
+    if (doc.status !== DOCUMENT_STATUS.APPROVED) {
+      doc.status = DOCUMENT_STATUS.APPROVED;
       doc.verifiedAt = new Date();
       doc.reviewedBy = adminId;
       doc.reviewedAt = new Date();
-      doc.rejectionReason = undefined;
     }
   });
 
-  // Approve driver
-  driver.approvalStatus = 'approved';
+  // Approve driver account
+  driver.approvalStatus = APPROVAL_STATUS.APPROVED;
   driver.approvalDate = new Date();
   driver.reviewedBy = adminId;
 
@@ -576,29 +395,77 @@ exports.approveDriverApplication = asyncHandler(async (req, res) => {
 
   await driver.save();
 
-  console.log(`✅ [Admin] Driver ${driverId} approved and activated`);
-
-  res.status(200).json({
+  res.json({
     success: true,
-    message: 'Driver approved and activated successfully',
+    message: 'Driver application approved successfully',
     data: {
       driverId: driver._id,
+      userId: driver.userId._id,
       phoneNumber: driver.userId.phoneNumber,
+      name: `${driver.userId.profile?.firstName || ''} ${driver.userId.profile?.lastName || ''}`.trim(),
       approvalStatus: driver.approvalStatus,
       approvalDate: driver.approvalDate,
-      adminComments: driver.adminComments,
-      totalDocuments: driver.documents.length,
-      approvedDocuments: driver.documents.filter(d => d.status === 'approved').length
+      adminComments: driver.adminComments
     }
   });
 });
 
-module.exports = {
-  getAllDriverDocuments,
-  getDriverDocuments,
-  updateDocumentStatus,
-  getPendingDocuments,
-  bulkUpdateDocuments,
-  rejectDriverApplication,
-  approveDriverApplication
-};
+/**
+ * Reject driver application and delete account
+ * DELETE /api/v1/admin/drivers/:driverId/reject
+ * @access Private (Admin only)
+ */
+exports.rejectDriverApplication = asyncHandler(async (req, res) => {
+  const { driverId } = req.params;
+  const { rejectionReason, adminComments } = req.body;
+
+  if (!rejectionReason) {
+    throw new ValidationError('Rejection reason is required');
+  }
+
+  const driver = await Driver.findById(driverId).populate('userId', 'phoneNumber profile');
+  if (!driver) {
+    throw new NotFoundError('Driver not found');
+  }
+
+  const userId = driver.userId._id;
+  const phoneNumber = driver.userId.phoneNumber;
+  const driverName = `${driver.userId.profile?.firstName || ''} ${driver.userId.profile?.lastName || ''}`.trim();
+
+  // Delete all documents from S3
+  const s3DeletionResults = [];
+  for (const doc of driver.documents) {
+    if (doc.url) {
+      try {
+        const s3Key = extractS3Key(doc.url);
+        await deleteFromS3(s3Key);
+        s3DeletionResults.push({ type: doc.type, deleted: true });
+      } catch (error) {
+        console.error(`Failed to delete S3 file for ${doc.type}:`, error);
+        s3DeletionResults.push({ type: doc.type, deleted: false, error: error.message });
+      }
+    }
+  }
+
+  // Delete Driver document
+  await Driver.findByIdAndDelete(driverId);
+
+  // Delete User document
+  await User.findByIdAndDelete(userId);
+
+  res.json({
+    success: true,
+    message: 'Driver application rejected and account deleted successfully',
+    data: {
+      driverId,
+      userId,
+      phoneNumber,
+      name: driverName,
+      rejectionReason,
+      adminComments,
+      documentsDeleted: s3DeletionResults.filter(r => r.deleted).length,
+      totalDocuments: driver.documents.length,
+      s3DeletionResults
+    }
+  });
+});
