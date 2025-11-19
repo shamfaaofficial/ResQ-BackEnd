@@ -321,10 +321,25 @@ exports.getUserActiveBooking = asyncHandler(async (req, res) => {
   }
   console.log('========== END GET USER ACTIVE BOOKING ==========\n');
 
+  // If booking exists with driver, fetch real-time driver location
+  let driverCurrentLocation = null;
+  if (booking && booking.driverId) {
+    const driver = await Driver.findById(booking.driverId._id).select('currentLocation');
+    if (driver && driver.currentLocation?.coordinates) {
+      driverCurrentLocation = {
+        latitude: driver.currentLocation.coordinates[1],
+        longitude: driver.currentLocation.coordinates[0],
+        address: driver.currentLocation.address,
+        lastUpdated: driver.currentLocation.lastUpdated
+      };
+    }
+  }
+
   res.status(200).json({
     success: true,
     data: {
-      booking: booking || null
+      booking: booking || null,
+      driverCurrentLocation: driverCurrentLocation  // Real-time driver location
     }
   });
 });

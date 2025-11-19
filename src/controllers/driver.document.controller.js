@@ -41,7 +41,7 @@ exports.getDocumentRequirements = asyncHandler(async (req, res) => {
  * @access Private (Driver only)
  */
 exports.getMyDocuments = asyncHandler(async (req, res) => {
-  const driverId = req.user.userId;
+  const driverId = req.userId;
 
   const driver = await Driver.findOne({ userId: driverId })
     .select('documents approvalStatus adminComments reviewedBy reviewedAt')
@@ -106,7 +106,7 @@ exports.getMyDocuments = asyncHandler(async (req, res) => {
  * @access Private (Driver only)
  */
 exports.uploadDocument = asyncHandler(async (req, res) => {
-  const driverId = req.user.userId;
+  const driverId = req.userId;
   const { documentType } = req.body;
 
   // Validate document type - only license and registration are required
@@ -199,7 +199,7 @@ exports.uploadDocument = asyncHandler(async (req, res) => {
  * @access Private (Driver only)
  */
 exports.deleteDocument = asyncHandler(async (req, res) => {
-  const driverId = req.user.userId;
+  const driverId = req.userId;
   const { documentType } = req.params;
 
   const driver = await Driver.findOne({ userId: driverId });
