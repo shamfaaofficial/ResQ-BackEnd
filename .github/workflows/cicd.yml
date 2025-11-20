@@ -19,15 +19,16 @@ jobs:
         run: |
           rm -rf node_modules .git
 
-      - name: Copy code to server
-        uses: appleboy/scp-action@v0.1.7
+      - name: Rsync files
+        uses: burnett01/rsync-deployments@v2
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT }}
-          source: "./*"
-          target: "/home/ubuntu/docker/resq/app/code"
+          switches: -az --delete
+          path: "./"
+          remote_host: ${{ secrets.SSH_HOST }}
+          remote_user: ${{ secrets.SSH_USERNAME }}
+          remote_path: "/home/ubuntu/docker/resq/app/code"
+          remote_key: ${{ secrets.SSH_PRIVATE_KEY }}
+
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v0.1.7
