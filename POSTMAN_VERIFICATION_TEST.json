@@ -1,0 +1,392 @@
+{
+  "info": {
+    "name": "Verification Code API Tests",
+    "description": "Test collection for driver verification code workflow",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. User Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phoneNumber\": \"+97431234567\",\n  \"password\": \"Password123!\"\n}"
+        },
+        "url": {
+          "raw": "{{BASE_URL}}/auth/user/login",
+          "host": ["{{BASE_URL}}"],
+          "path": ["auth", "user", "login"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const res = pm.response.json();",
+              "if (res.success && res.data.tokens) {",
+              "  pm.environment.set('USER_TOKEN', res.data.tokens.accessToken);",
+              "  console.log('User token saved');",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Driver Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phoneNumber\": \"+97450000001\",\n  \"password\": \"Password123!\"\n}"
+        },
+        "url": {
+          "raw": "{{BASE_URL}}/auth/driver/login",
+          "host": ["{{BASE_URL}}"],
+          "path": ["auth", "driver", "login"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const res = pm.response.json();",
+              "if (res.success && res.data.tokens) {",
+              "  pm.environment.set('DRIVER_TOKEN', res.data.tokens.accessToken);",
+              "  console.log('Driver token saved');",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Create Booking (User)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{USER_TOKEN}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"pickupLocation\": {\n    \"coordinates\": [51.5074, 25.2760],\n    \"address\": \"Doha, Qatar\",\n    \"placeName\": \"Pickup Point\"\n  },\n  \"dropoffLocation\": {\n    \"coordinates\": [51.5200, 25.2900],\n    \"address\": \"West Bay, Doha\",\n    \"placeName\": \"Dropoff Point\"\n  },\n  \"vehicleType\": \"sedan\",\n  \"notes\": \"Test verification code\"\n}"
+        },
+        "url": {
+          "raw": "{{BASE_URL}}/booking/create",
+          "host": ["{{BASE_URL}}"],
+          "path": ["booking", "create"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const res = pm.response.json();",
+              "if (res.success && res.data.booking) {",
+              "  pm.environment.set('BOOKING_ID', res.data.booking.id);",
+              "  console.log('Booking ID:', res.data.booking.id);",
+              "  console.log('Booking Number:', res.data.booking.bookingNumber);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Accept Booking (Driver)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{DRIVER_TOKEN}}"
+          }
+        ],
+        "url": {
+          "raw": "{{BASE_URL}}/booking/{{BOOKING_ID}}/accept",
+          "host": ["{{BASE_URL}}"],
+          "path": ["booking", "{{BOOKING_ID}}", "accept"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const res = pm.response.json();",
+              "if (res.success && res.data.booking.verificationCode) {",
+              "  const code = res.data.booking.verificationCode.code;",
+              "  pm.environment.set('VERIFICATION_CODE', code);",
+              "  console.log('✅ Verification Code Generated:', code);",
+              "  console.log('Payment Status:', res.data.booking.payment?.status);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Mark Driver Arrived",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{DRIVER_TOKEN}}"
+          }
+        ],
+        "url": {
+          "raw": "{{BASE_URL}}/trip/{{BOOKING_ID}}/mark-arrived",
+          "host": ["{{BASE_URL}}"],
+          "path": ["trip", "{{BOOKING_ID}}", "mark-arrived"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const res = pm.response.json();",
+              "if (res.success && res.data.verificationCode) {",
+              "  pm.environment.set('VERIFICATION_CODE', res.data.verificationCode);",
+              "  console.log('✅ Verification Code:', res.data.verificationCode);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Get Trip Details (User sees code)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{USER_TOKEN}}"
+          }
+        ],
+        "url": {
+          "raw": "{{BASE_URL}}/trip/{{BOOKING_ID}}/details",
+          "host": ["{{BASE_URL}}"],
+          "path": ["trip", "{{BOOKING_ID}}", "details"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const res = pm.response.json();",
+              "if (res.success && res.data.verificationCode) {",
+              "  console.log('User sees code:', res.data.verificationCode.code);",
+              "  console.log('Is Verified:', res.data.verificationCode.isVerified);",
+              "  pm.environment.set('VERIFICATION_CODE', res.data.verificationCode.code);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. ⭐ Verify Code (Driver)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{DRIVER_TOKEN}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"verificationCode\": \"{{VERIFICATION_CODE}}\"\n}"
+        },
+        "url": {
+          "raw": "{{BASE_URL}}/trip/{{BOOKING_ID}}/verify-code",
+          "host": ["{{BASE_URL}}"],
+          "path": ["trip", "{{BOOKING_ID}}", "verify-code"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const res = pm.response.json();",
+              "if (res.success) {",
+              "  console.log('✅ VERIFICATION SUCCESSFUL!');",
+              "  console.log('Verified at:', res.data.verifiedAt);",
+              "} else {",
+              "  console.log('❌ VERIFICATION FAILED:', res.message);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Start Trip (Driver)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{DRIVER_TOKEN}}"
+          }
+        ],
+        "url": {
+          "raw": "{{BASE_URL}}/booking/{{BOOKING_ID}}/start",
+          "host": ["{{BASE_URL}}"],
+          "path": ["booking", "{{BOOKING_ID}}", "start"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const res = pm.response.json();",
+              "if (res.success) {",
+              "  console.log('✅ TRIP STARTED!');",
+              "  console.log('Status:', res.data.booking.status);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "ERROR TEST: Verify with Wrong Code",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{DRIVER_TOKEN}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"verificationCode\": \"9999\"\n}"
+        },
+        "url": {
+          "raw": "{{BASE_URL}}/trip/{{BOOKING_ID}}/verify-code",
+          "host": ["{{BASE_URL}}"],
+          "path": ["trip", "{{BOOKING_ID}}", "verify-code"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Should reject wrong code', function() {",
+              "  pm.response.to.have.status(400);",
+              "  const res = pm.response.json();",
+              "  pm.expect(res.message).to.include('Invalid');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "ERROR TEST: Verify without Code",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{DRIVER_TOKEN}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"verificationCode\": \"\"\n}"
+        },
+        "url": {
+          "raw": "{{BASE_URL}}/trip/{{BOOKING_ID}}/verify-code",
+          "host": ["{{BASE_URL}}"],
+          "path": ["trip", "{{BOOKING_ID}}", "verify-code"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Should reject empty code', function() {",
+              "  pm.response.to.have.status(400);",
+              "  const res = pm.response.json();",
+              "  pm.expect(res.error).to.include('required');",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "BASE_URL",
+      "value": "http://localhost:5000/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "USER_TOKEN",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "DRIVER_TOKEN",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "BOOKING_ID",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "VERIFICATION_CODE",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

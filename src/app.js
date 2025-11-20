@@ -77,6 +77,7 @@ const utilsRoutes = require('./routes/utils.routes');
 const bookingRoutes = require('./routes/booking.routes');
 const paymentRoutes = require('./routes/payment.routes');
 const tripRoutes = require('./routes/trip.routes');
+const tempRoutes = require('./routes/temp.routes'); // TEMPORARY - DELETE AFTER USE
 
 // Initialize Express app
 const app = express();
@@ -187,6 +188,7 @@ app.use('/api/v1/payment', paymentRoutes);
 app.use('/api/v1/trip', tripRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/utils',  utilsRoutes);
+app.use('/api/v1/temp', tempRoutes); // TEMPORARY - DELETE AFTER USE
 
 // Serve uploaded files
 app.use('/uploads', express.static('uploads'));

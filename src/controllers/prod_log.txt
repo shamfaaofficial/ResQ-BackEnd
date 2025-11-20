@@ -1,0 +1,684 @@
+[Booking] Querying MongoDB for drivers near [74.8413559, 12.9235599] within 10km
+[Booking] Found 1 nearby drivers in MongoDB
+GET /api/v1/user/nearby-drivers?latitude=12.9235599&longitude=74.8413559&radius=10.0 200 22.710 ms - 242
+PATCH /api/v1/driver/location 200 17.901 ms - 243
+
+========== GET USER ACTIVE BOOKING ==========
+[GetUserActiveBooking] User ID: new ObjectId('690f199ac08d580e05620dd4')
+[GetUserActiveBooking] Timestamp: 2025-11-16T10:15:38.923Z
+[GetUserActiveBooking] Last 5 bookings for this user:
+[]
+[GetUserActiveBooking] ❌ No active booking found
+[GetUserActiveBooking] Query statuses: [
+  'requested',
+  'accepted',
+  'driver_arrived',
+  'in_progress',
+  'payment_completed'
+]
+========== END GET USER ACTIVE BOOKING ==========
+
+GET /api/v1/bookings/user/active 200 9.563 ms - 40
+PATCH /api/v1/driver/location 200 12.173 ms - 243
+[Booking] Querying MongoDB for drivers near [74.8421445, 12.9229211] within 10km
+[Booking] Found 1 nearby drivers in MongoDB
+GET /api/v1/user/nearby-drivers?latitude=12.9229211&longitude=74.8421445&radius=10.0 200 14.809 ms - 242
+PATCH /api/v1/driver/location 200 13.658 ms - 243
+[GoogleMaps] Distance calculation error: Google Maps API error: REQUEST_DENIED - The provided API key is invalid.
+Google Maps distance calculation failed, using Haversine formula: Distance calculation failed: Google Maps API error: REQUEST_DENIED - The provided API key is invalid.
+GET /api/v1/bookings/price-estimate?pickupLat=12.9229211&pickupLng=74.8421445&dropoffLat=12.8854777&dropoffLng=74.8388112 200 210.056 ms - 308
+[RequestDriver] Calculating distances for booking...
+[RequestDriver] Driver location: [ 74.8421445, 12.9229211 ]
+[RequestDriver] Pickup location: [ 74.8421445, 12.9229211 ]
+[RequestDriver] Dropoff location: [ 74.8388112, 12.8854777 ]
+[GoogleMaps] Distance calculation error: Google Maps API error: REQUEST_DENIED - The provided API key is invalid.
+Google Maps distance calculation failed, using Haversine formula: Distance calculation failed: Google Maps API error: REQUEST_DENIED - The provided API key is invalid.
+[RequestDriver] Driver to pickup distance calculated: {
+  distance: 0,
+  distanceText: '0.00 km',
+  duration: null,
+  durationText: 'N/A'
+}
+Directions API failed, falling back to Distance Matrix: Could not calculate route
+[GoogleMaps] Distance calculation error: Google Maps API error: REQUEST_DENIED - The provided API key is invalid.
+Google Maps distance calculation failed, using Haversine formula: Distance calculation failed: Google Maps API error: REQUEST_DENIED - The provided API key is invalid.
+[RequestDriver] Trip route calculated: {
+  distance: 4.18,
+  distanceText: '4.18 km',
+  duration: null,
+  durationText: 'N/A',
+  polyline: null
+}
+✅ Push notification sent successfully: projects/resq-7cd08/messages/0:1763288171789258%711fb1e5f9fd7ecd
+Notification created: booking_request - New Booking Request
+[RequestDriver] Notification sent to driver successfully
+
+╔════════════════════════════════════════════════════════════════╗
+║  🚨🚨🚨 EMITTING NEW BOOKING REQUEST TO DRIVER 🚨🚨🚨         ║
+╚════════════════════════════════════════════════════════════════╝
+📤 Emission Details:
+   Event Name: booking:new:request
+   Target Driver ID: 690f0e1a482c36296774fe6c
+   Target Room: driver:690f0e1a482c36296774fe6c
+   Booking ID: 6919a46bf79201df2c3e39de
+   Booking Number: BK1763288171561340
+   Vehicle Type: undefined
+   Total Amount: 151.8 QAR
+   ETA: null minutes
+   User ID: 690f199ac08d580e05620dd4
+   Timestamp: 2025-11-16T10:16:11.869Z
+
+📦 Full Payload:
+{
+  "bookingId": "6919a46bf79201df2c3e39de",
+  "bookingNumber": "BK1763288171561340",
+  "pickupLocation": {
+    "address": "WRFR+4WP, Padukodi, Mangaluru, 575013",
+    "coordinates": [
+      74.8421445,
+      12.9229211
+    ]
+  },
+  "dropoffLocation": {
+    "address": "Mangaluru, Karnataka, India",
+    "coordinates": [
+      74.8388112,
+      12.8854777
+    ]
+  },
+  "pricing": {
+    "total": 151.8,
+    "basePrice": 110,
+    "perKmRate": 10,
+    "distance": 4.18
+  },
+  "eta": null,
+  "expiresAt": "2025-11-16T10:17:11.561Z",
+  "userId": "690f199ac08d580e05620dd4",
+  "user": {
+    "id": "690f199ac08d580e05620dd4",
+    "phoneNumber": "+919656832396",
+    "name": "User"
+  },
+  "status": "requested",
+  "createdAt": "2025-11-16T10:16:11.564Z",
+  "timestamp": "2025-11-16T10:16:11.869Z"
+}
+
+🔍 Room Status Check:
+   Room: driver:690f0e1a482c36296774fe6c
+   Sockets in room: 1
+   ✅ Driver has 1 active socket(s) in room
+   Event WILL be delivered to driver
+
+✅✅✅ BOOKING REQUEST EMISSION COMPLETED ✅✅✅
+   Event emitted to room: driver:690f0e1a482c36296774fe6c
+   Number of recipients: 1
+   Timestamp: 2025-11-16T10:16:11.869Z
+════════════════════════════════════════════════════════════════
+
+POST /api/v1/bookings/request-driver 201 630.964 ms - 810
+[GoogleMaps] Distance calculation error: Google Maps API error: REQUEST_DENIED - The provided API key is invalid.
+Google Maps distance calculation failed, using Haversine formula: Distance calculation failed: Google Maps API error: REQUEST_DENIED - The provided API key is invalid.
+GET /api/v1/bookings/driver/6919a46bf79201df2c3e39de/details 200 124.290 ms - 893
+[GetBookingStatus] Fetching booking status for: 6919a46bf79201df2c3e39de
+[GetBookingStatus] Booking status: requested
+[GetBookingStatus] Payment status from DB: pending
+[GetBookingStatus] Full payment object: {
+  "status": "pending",
+  "gateway": "MyFatoorah"
+}
+[GetBookingStatus] Response payment status: pending
+GET /api/v1/bookings/user/6919a46bf79201df2c3e39de/status 200 11.726 ms - 458
+PATCH /api/v1/driver/location 200 15.676 ms - 243
+[GetBookingStatus] Fetching booking status for: 6919a46bf79201df2c3e39de
+[GetBookingStatus] Booking status: requested
+[GetBookingStatus] Payment status from DB: pending
+[GetBookingStatus] Full payment object: {
+  "status": "pending",
+  "gateway": "MyFatoorah"
+}
+[GetBookingStatus] Response payment status: pending
+GET /api/v1/bookings/user/6919a46bf79201df2c3e39de/status 200 10.715 ms - 458
+[GetBookingStatus] Fetching booking status for: 6919a46bf79201df2c3e39de
+[GetBookingStatus] Booking status: requested
+[GetBookingStatus] Payment status from DB: pending
+[GetBookingStatus] Full payment object: {
+  "status": "pending",
+  "gateway": "MyFatoorah"
+}
+[GetBookingStatus] Response payment status: pending
+GET /api/v1/bookings/user/6919a46bf79201df2c3e39de/status 200 11.281 ms - 458
+[GetBookingStatus] Fetching booking status for: 6919a46bf79201df2c3e39de
+[GetBookingStatus] Booking status: requested
+[GetBookingStatus] Payment status from DB: pending
+[GetBookingStatus] Full payment object: {
+  "status": "pending",
+  "gateway": "MyFatoorah"
+}
+[GetBookingStatus] Response payment status: pending
+GET /api/v1/bookings/user/6919a46bf79201df2c3e39de/status 200 12.027 ms - 458
+
+========== DRIVER CANCELLATION STARTED ==========
+[CancelBookingByDriver] Booking ID: 6919a46bf79201df2c3e39de
+[CancelBookingByDriver] Cancellation reason: undefined
+[CancelBookingByDriver] Driver ID: new ObjectId('690f0e1a482c36296774fe6e')
+[CancelBookingByDriver] Current booking status: requested
+[CancelBookingByDriver] Current driverId: new ObjectId('690f0e1a482c36296774fe6e')
+[CancelBookingByDriver] Current payment status: pending
+[CancelBookingByDriver] Payment details: {
+  "status": "pending",
+  "gateway": "MyFatoorah"
+}
+[CancelBookingByDriver] Is rejection before acceptance? false
+[CancelBookingByDriver] Checking payment status for refund handling...
+[CancelBookingByDriver] PAYMENT_STATUS.COMPLETED: completed
+[CancelBookingByDriver] PAYMENT_STATUS.PENDING: pending
+[CancelBookingByDriver] PAYMENT_STATUS.FAILED: failed
+[CancelBookingByDriver] PAYMENT_STATUS.REFUNDED: refunded
+[CancelBookingByDriver] Current booking.payment.status: pending
+[CancelBookingByDriver] Type of booking.payment.status: string
+[CancelBookingByDriver] Strict equality check (COMPLETED): false
+[CancelBookingByDriver] Strict equality check (PENDING): true
+[CancelBookingByDriver] Loose equality check (completed string): false
+[CancelBookingByDriver] Loose equality check (pending string): true
+[CancelBookingByDriver] ✅ Payment was PENDING - marking as FAILED
+[CancelBookingByDriver] Payment status updated to: failed
+[CancelBookingByDriver] Final payment status after switch: failed
+[CancelBookingByDriver] Saving booking with updated status...
+[CancelBookingByDriver] ✅ Booking saved successfully
+[CancelBookingByDriver] Final booking status: cancelled_by_driver
+[CancelBookingByDriver] Final payment status: failed
+[CancelBookingByDriver] Populating user details for notification...
+[CancelBookingByDriver] User details populated - User ID: new ObjectId('690f199ac08d580e05620dd4')
+[CancelBookingByDriver] Sending cancellation notification to user...
+✅ Push notification sent successfully: projects/resq-7cd08/messages/0:1763288196349162%c0bf50c8c0bf50c8
+Notification created: booking_cancelled - Booking Cancelled
+[CancelBookingByDriver] ✅ Notification sent successfully
+[CancelBookingByDriver] Emitting socket event for booking update...
+
+📢 [Socket Emit] booking:status:update
+   Booking ID: 6919a46bf79201df2c3e39de
+   New Status: cancelled_by_driver
+   User ID: {
+  profile: { profileImage: null },
+  _id: new ObjectId('690f199ac08d580e05620dd4'),
+  phoneNumber: '+919656832396',
+  fcmToken: 'cESLcPKWTVWqUEPHRbuF-w:APA91bFhDsmRTtvsabqBYF0untR6yxRMvE4ML8OQouAyAAu8_KGJEoWXB2MkO5n_XOgS1A9bbQKbcz5pgYdGKxrJLWqT9QRw2msDpg5HLslsmz_7KVlJGoc',
+  fullName: 'undefined undefined',
+  id: '690f199ac08d580e05620dd4'
+}
+   Driver ID: 690f0e1a482c36296774fe6e
+   ✅ Emitted to user room: user:{
+  profile: { profileImage: null },
+  _id: new ObjectId('690f199ac08d580e05620dd4'),
+  phoneNumber: '+919656832396',
+  fcmToken: 'cESLcPKWTVWqUEPHRbuF-w:APA91bFhDsmRTtvsabqBYF0untR6yxRMvE4ML8OQouAyAAu8_KGJEoWXB2MkO5n_XOgS1A9bbQKbcz5pgYdGKxrJLWqT9QRw2msDpg5HLslsmz_7KVlJGoc',
+  fullName: 'undefined undefined',
+  id: '690f199ac08d580e05620dd4'
+}
+   ✅ Emitted to driver room: driver:690f0e1a482c36296774fe6e
+   ✅ Emitted to booking room: booking:6919a46bf79201df2c3e39de
+   Payload: {
+  "bookingId": "6919a46bf79201df2c3e39de",
+  "status": "cancelled_by_driver",
+  "timeline": {
+    "requestedAt": "2025-11-16T10:16:11.563Z",
+    "cancelledAt": "2025-11-16T10:16:36.152Z"
+  }
+}
+[CancelBookingByDriver] ✅ Socket event emitted successfully
+[CancelBookingByDriver] Preparing response...
+[CancelBookingByDriver] Response booking payment status: failed
+[CancelBookingByDriver] Response booking status: cancelled_by_driver
+[CancelBookingByDriver] Full booking.payment object: {
+  "status": "failed",
+  "gateway": "MyFatoorah",
+  "failedAt": "2025-11-16T10:16:36.151Z"
+}
+========== DRIVER CANCELLATION COMPLETED ==========
+
+[CancelBookingByDriver] Response payment status in JSON: failed
+PATCH /api/v1/bookings/driver/6919a46bf79201df2c3e39de/cancel 200 294.325 ms - 1696
+[Booking] Querying MongoDB for drivers near [74.8421445, 12.9229211] within 10km
+[Booking] Found 1 nearby drivers in MongoDB
+GET /api/v1/user/nearby-drivers?latitude=12.9229211&longitude=74.8421445&radius=10.0 200 14.588 ms - 242
+PATCH /api/v1/driver/location 200 12.182 ms - 241
+PATCH /api/v1/driver/location 200 15.859 ms - 243
+
+╔════════════════════════════════════════════════════════╗
+║          🔌 SOCKET DISCONNECTION                      ║
+╚════════════════════════════════════════════════════════╝
+   Socket ID: Fq2XkkvmpoP6bTj8AAAB
+   User ID: 690f0e1a482c36296774fe6c
+   Role: driver
+   Reason: transport close
+   Disconnected at: 2025-11-16T10:17:04.854Z
+   Remaining Connections: 0
+
+╔═══════════════════════════════════════════════════════════════╗
+║  🔐 SOCKET AUTH ATTEMPT - 2025-11-16T10:17:28.587Z  ║
+╚═══════════════════════════════════════════════════════════════╝
+📊 Connection Details:
+   Socket ID: uZ28RHJtxHB2t7yuAAAD
+   Client IP: ::ffff:172.19.0.3
+   Transport: websocket
+   URL: /socket.io/?EIO=4&transport=websocket
+   Query: {
+  "EIO": "4",
+  "transport": "websocket"
+}
+
+🌐 Request Headers:
+   Host: dev.resq-qa.com
+   Origin: NOT_PROVIDED
+   User-Agent: Dart/3.9 (dart:io)
+   X-Forwarded-For: 152.57.51.135
+   X-Real-IP: 152.57.51.135
+
+🔑 Token Authentication:
+   Token received: YES
+   Token preview: eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
+   Token length: 197 characters
+   Verifying token...
+
+✅✅✅ AUTH SUCCESS ✅✅✅
+   User ID: 690f0e1a482c36296774fe6c
+   Role: driver
+   Token Issued: 2025-11-16T09:36:54.000Z
+   Token Expiry: 2025-11-16T21:36:54.000Z
+   Time until expiry: 679 minutes
+═══════════════════════════════════════════════════════════════
+
+
+╔════════════════════════════════════════════════════════════════╗
+║  ✅ SOCKET CONNECTION ESTABLISHED - 2025-11-16T10:17:28.589Z  ║
+╚════════════════════════════════════════════════════════════════╝
+📊 Connection Info:
+   Socket ID: uZ28RHJtxHB2t7yuAAAD
+   User ID: 690f0e1a482c36296774fe6c
+   Role: DRIVER
+   Transport: WEBSOCKET
+   Client IP: ::ffff:172.19.0.3
+   Connected at: 2025-11-16T10:17:28.589Z
+   Total Active Connections: 1
+════════════════════════════════════════════════════════════════
+
+
+╔════════════════════════════════════════════════════════════════╗
+║  🚗 DRIVER AUTO-JOINED ROOM                                   ║
+╚════════════════════════════════════════════════════════════════╝
+   Driver ID: 690f0e1a482c36296774fe6c
+   Room Name: driver:690f0e1a482c36296774fe6c
+   Socket ID: uZ28RHJtxHB2t7yuAAAD
+   Timestamp: 2025-11-16T10:17:28.590Z
+   ✅ Confirmation event 'driver:joined' emitted to driver
+   Payload: {
+  "success": true,
+  "room": "driver:690f0e1a482c36296774fe6c",
+  "socketId": "uZ28RHJtxHB2t7yuAAAD",
+  "userId": "690f0e1a482c36296774fe6c",
+  "timestamp": "2025-11-16T10:17:28.590Z"
+}
+════════════════════════════════════════════════════════════════
+
+📦 [Packet #1] Type: message | Socket: uZ28RHJtxHB2t7yuAAAD | User: 690f0e1a482c36296774fe6c
+
+╔════════════════════════════════════════════════════════════════╗
+║  🚪 MANUAL DRIVER:JOIN EVENT RECEIVED                        ║
+╚════════════════════════════════════════════════════════════════╝
+   Driver ID from event: 690f0e1a482c36296774fe6c
+   Authenticated User ID: 690f0e1a482c36296774fe6c
+   Authenticated Role: driver
+   Socket ID: uZ28RHJtxHB2t7yuAAAD
+   Timestamp: 2025-11-16T10:17:28.837Z
+
+✅✅✅ MANUAL DRIVER JOIN SUCCESSFUL ✅✅✅
+   Driver ID: 690f0e1a482c36296774fe6c
+   Room: driver:690f0e1a482c36296774fe6c
+   Socket ID: uZ28RHJtxHB2t7yuAAAD
+   ✅ Confirmation event 'driver:joined' emitted
+   Payload: {
+  "success": true,
+  "room": "driver:690f0e1a482c36296774fe6c",
+  "socketId": "uZ28RHJtxHB2t7yuAAAD",
+  "userId": "690f0e1a482c36296774fe6c",
+  "timestamp": "2025-11-16T10:17:28.838Z"
+}
+════════════════════════════════════════════════════════════════
+
+GET /api/v1/driver/profile 200 9.544 ms - 1143
+[RequestDriver] Calculating distances for booking...
+[RequestDriver] Driver location: [ 74.8428176, 12.9234304 ]
+[RequestDriver] Pickup location: [ 74.8421445, 12.9229211 ]
+[RequestDriver] Dropoff location: [ 74.8388112, 12.8854777 ]
+[GoogleMaps] Distance calculation error: Google Maps API error: REQUEST_DENIED - The provided API key is invalid.
+Google Maps distance calculation failed, using Haversine formula: Distance calculation failed: Google Maps API error: REQUEST_DENIED - The provided API key is invalid.
+[RequestDriver] Driver to pickup distance calculated: {
+  distance: 0.09,
+  distanceText: '0.09 km',
+  duration: null,
+  durationText: 'N/A'
+}
+Directions API failed, falling back to Distance Matrix: Could not calculate route
+[GoogleMaps] Distance calculation error: Google Maps API error: REQUEST_DENIED - The provided API key is invalid.
+Google Maps distance calculation failed, using Haversine formula: Distance calculation failed: Google Maps API error: REQUEST_DENIED - The provided API key is invalid.
+[RequestDriver] Trip route calculated: {
+  distance: 4.18,
+  distanceText: '4.18 km',
+  duration: null,
+  durationText: 'N/A',
+  polyline: null
+}
+✅ Push notification sent successfully: projects/resq-7cd08/messages/0:1763288282759540%711fb1e5f9fd7ecd
+Notification created: booking_request - New Booking Request
+[RequestDriver] Notification sent to driver successfully
+
+╔════════════════════════════════════════════════════════════════╗
+║  🚨🚨🚨 EMITTING NEW BOOKING REQUEST TO DRIVER 🚨🚨🚨         ║
+╚════════════════════════════════════════════════════════════════╝
+📤 Emission Details:
+   Event Name: booking:new:request
+   Target Driver ID: 690f0e1a482c36296774fe6c
+   Target Room: driver:690f0e1a482c36296774fe6c
+   Booking ID: 6919a4daf79201df2c3e3b53
+   Booking Number: BK1763288282557265
+   Vehicle Type: undefined
+   Total Amount: 151.8 QAR
+   ETA: null minutes
+   User ID: 690f199ac08d580e05620dd4
+   Timestamp: 2025-11-16T10:18:02.814Z
+
+📦 Full Payload:
+{
+  "bookingId": "6919a4daf79201df2c3e3b53",
+  "bookingNumber": "BK1763288282557265",
+  "pickupLocation": {
+    "address": "WRFR+4WP, Padukodi, Mangaluru, 575013",
+    "coordinates": [
+      74.8421445,
+      12.9229211
+    ]
+  },
+  "dropoffLocation": {
+    "address": "Mangaluru, Karnataka, India",
+    "coordinates": [
+      74.8388112,
+      12.8854777
+    ]
+  },
+  "pricing": {
+    "total": 151.8,
+    "basePrice": 110,
+    "perKmRate": 10,
+    "distance": 4.18
+  },
+  "eta": null,
+  "expiresAt": "2025-11-16T10:19:02.557Z",
+  "userId": "690f199ac08d580e05620dd4",
+  "user": {
+    "id": "690f199ac08d580e05620dd4",
+    "phoneNumber": "+919656832396",
+    "name": "User"
+  },
+  "status": "requested",
+  "createdAt": "2025-11-16T10:18:02.560Z",
+  "timestamp": "2025-11-16T10:18:02.814Z"
+}
+
+🔍 Room Status Check:
+   Room: driver:690f0e1a482c36296774fe6c
+   Sockets in room: 1
+   ✅ Driver has 1 active socket(s) in room
+   Event WILL be delivered to driver
+
+✅✅✅ BOOKING REQUEST EMISSION COMPLETED ✅✅✅
+   Event emitted to room: driver:690f0e1a482c36296774fe6c
+   Number of recipients: 1
+   Timestamp: 2025-11-16T10:18:02.814Z
+════════════════════════════════════════════════════════════════
+
+POST /api/v1/bookings/request-driver 201 690.865 ms - 810
+
+========== ACCEPT BOOKING REQUEST ==========
+[AcceptBooking] Booking ID: 6919a4daf79201df2c3e3b53
+[AcceptBooking] Driver User ID: new ObjectId('690f0e1a482c36296774fe6c')
+[AcceptBooking] Driver found: new ObjectId('690f0e1a482c36296774fe6e')
+[AcceptBooking] ❌ Atomic update failed - booking not found or already accepted
+[AcceptBooking] Existing booking status: requested
+[AcceptBooking] Existing booking driverId: new ObjectId('690f0e1a482c36296774fe6e')
+[AcceptBooking] ⚠️ Same driver retrying - recovering from partial acceptance
+[AcceptBooking] ✅ Booking accepted successfully
+[AcceptBooking] Updating booking status from REQUESTED to ACCEPTED
+[AcceptBooking] Auto-completing payment for development...
+[AcceptBooking] ✅ Booking saved with status: payment_completed
+[AcceptBooking] ✅ Payment status: completed
+[AcceptBooking] ✅ Booking ID: new ObjectId('6919a4daf79201df2c3e3b53')
+[AcceptBooking] ✅ Driver ID: new ObjectId('690f0e1a482c36296774fe6e')
+✅ Push notification sent successfully: projects/resq-7cd08/messages/0:1763288285255222%c0bf50c8c0bf50c8
+Notification created: booking_accepted - Booking Accepted
+[AcceptBooking] Booking acceptance notification sent to user
+
+📢 [Socket Emit] booking:status:update
+   Booking ID: 6919a4daf79201df2c3e3b53
+   New Status: payment_completed
+   User ID: {
+  profile: { profileImage: null },
+  _id: new ObjectId('690f199ac08d580e05620dd4'),
+  phoneNumber: '+919656832396',
+  fcmToken: 'cESLcPKWTVWqUEPHRbuF-w:APA91bFhDsmRTtvsabqBYF0untR6yxRMvE4ML8OQouAyAAu8_KGJEoWXB2MkO5n_XOgS1A9bbQKbcz5pgYdGKxrJLWqT9QRw2msDpg5HLslsmz_7KVlJGoc',
+  fullName: 'undefined undefined',
+  id: '690f199ac08d580e05620dd4'
+}
+   Driver ID: 690f0e1a482c36296774fe6e
+   ✅ Emitted to user room: user:{
+  profile: { profileImage: null },
+  _id: new ObjectId('690f199ac08d580e05620dd4'),
+  phoneNumber: '+919656832396',
+  fcmToken: 'cESLcPKWTVWqUEPHRbuF-w:APA91bFhDsmRTtvsabqBYF0untR6yxRMvE4ML8OQouAyAAu8_KGJEoWXB2MkO5n_XOgS1A9bbQKbcz5pgYdGKxrJLWqT9QRw2msDpg5HLslsmz_7KVlJGoc',
+  fullName: 'undefined undefined',
+  id: '690f199ac08d580e05620dd4'
+}
+   ✅ Emitted to driver room: driver:690f0e1a482c36296774fe6e
+   ✅ Emitted to booking room: booking:6919a4daf79201df2c3e3b53
+   Payload: {
+  "bookingId": "6919a4daf79201df2c3e3b53",
+  "status": "payment_completed",
+  "timeline": {
+    "requestedAt": "2025-11-16T10:18:02.559Z",
+    "acceptedAt": "2025-11-16T10:18:05.161Z",
+    "paymentCompletedAt": "2025-11-16T10:18:05.161Z"
+  }
+}
+PATCH /api/v1/bookings/driver/6919a4daf79201df2c3e3b53/accept 200 164.266 ms - 1786
+GET /api/v1/bookings/driver/active 200 12.483 ms - 1466
+[GetBookingStatus] Fetching booking status for: 6919a4daf79201df2c3e3b53
+[GetBookingStatus] Booking status: payment_completed
+[GetBookingStatus] Payment status from DB: completed
+[GetBookingStatus] Full payment object: {
+  "status": "completed",
+  "method": "Auto-completed (Development)",
+  "gateway": "N/A",
+  "paidAmount": 151.8,
+  "paidAt": "2025-11-16T10:18:05.161Z",
+  "gatewayResponse": {
+    "note": "Auto-completed for testing"
+  }
+}
+[GetBookingStatus] Response payment status: completed
+GET /api/v1/bookings/user/6919a4daf79201df2c3e3b53/status 200 11.691 ms - 651
+
+========== GET USER ACTIVE BOOKING ==========
+[GetUserActiveBooking] User ID: new ObjectId('690f199ac08d580e05620dd4')
+[GetUserActiveBooking] Timestamp: 2025-11-16T10:18:09.307Z
+[GetUserActiveBooking] Last 5 bookings for this user:
+[
+  {
+    "_id": "6919a4daf79201df2c3e3b53",
+    "bookingNumber": "BK1763288282557265",
+    "status": "payment_completed",
+    "payment": {
+      "status": "completed"
+    },
+    "createdAt": "2025-11-16T10:18:02.560Z"
+  }
+]
+[GetUserActiveBooking] ✅ Found active booking: BK1763288282557265
+[GetUserActiveBooking] Booking status: payment_completed
+[GetUserActiveBooking] Payment status: completed
+========== END GET USER ACTIVE BOOKING ==========
+
+GET /api/v1/bookings/user/active 200 17.978 ms - 2629
+PATCH /api/v1/driver/location 200 13.176 ms - 246
+
+========== GET USER ACTIVE BOOKING ==========
+[GetUserActiveBooking] User ID: new ObjectId('690f199ac08d580e05620dd4')
+[GetUserActiveBooking] Timestamp: 2025-11-16T10:18:13.039Z
+[GetUserActiveBooking] Last 5 bookings for this user:
+[
+  {
+    "_id": "6919a4daf79201df2c3e3b53",
+    "bookingNumber": "BK1763288282557265",
+    "status": "payment_completed",
+    "payment": {
+      "status": "completed"
+    },
+    "createdAt": "2025-11-16T10:18:02.560Z"
+  }
+]
+[GetUserActiveBooking] ✅ Found active booking: BK1763288282557265
+[GetUserActiveBooking] Booking status: payment_completed
+[GetUserActiveBooking] Payment status: completed
+========== END GET USER ACTIVE BOOKING ==========
+
+GET /api/v1/bookings/user/active 200 16.658 ms - 2632
+[Booking] Querying MongoDB for drivers near [74.841575, 12.9232659] within 10km
+[Booking] Found 1 nearby drivers in MongoDB
+GET /api/v1/user/nearby-drivers?latitude=12.9232659&longitude=74.841575&radius=10.0 200 11.434 ms - 245
+
+========== DRIVER CANCELLATION STARTED ==========
+[CancelBookingByDriver] Booking ID: 6919a4daf79201df2c3e3b53
+[CancelBookingByDriver] Cancellation reason: undefined
+[CancelBookingByDriver] Driver ID: new ObjectId('690f0e1a482c36296774fe6e')
+[CancelBookingByDriver] Current booking status: payment_completed
+[CancelBookingByDriver] Current driverId: new ObjectId('690f0e1a482c36296774fe6e')
+[CancelBookingByDriver] Current payment status: completed
+[CancelBookingByDriver] Payment details: {
+  "status": "completed",
+  "method": "Auto-completed (Development)",
+  "gateway": "N/A",
+  "paidAmount": 151.8,
+  "paidAt": "2025-11-16T10:18:05.161Z",
+  "gatewayResponse": {
+    "note": "Auto-completed for testing"
+  }
+}
+[CancelBookingByDriver] Is rejection before acceptance? false
+[CancelBookingByDriver] Checking payment status for refund handling...
+[CancelBookingByDriver] PAYMENT_STATUS.COMPLETED: completed
+[CancelBookingByDriver] PAYMENT_STATUS.PENDING: pending
+[CancelBookingByDriver] PAYMENT_STATUS.FAILED: failed
+[CancelBookingByDriver] PAYMENT_STATUS.REFUNDED: refunded
+[CancelBookingByDriver] Current booking.payment.status: completed
+[CancelBookingByDriver] Type of booking.payment.status: string
+[CancelBookingByDriver] Strict equality check (COMPLETED): true
+[CancelBookingByDriver] Strict equality check (PENDING): false
+[CancelBookingByDriver] Loose equality check (completed string): true
+[CancelBookingByDriver] Loose equality check (pending string): false
+[CancelBookingByDriver] ✅ Payment was COMPLETED - marking for REFUND
+[CancelBookingByDriver] Payment status updated to: refunded
+[CancelBookingByDriver] Final payment status after switch: refunded
+[CancelBookingByDriver] Saving booking with updated status...
+[CancelBookingByDriver] ✅ Booking saved successfully
+[CancelBookingByDriver] Final booking status: cancelled_by_driver
+[CancelBookingByDriver] Final payment status: refunded
+[CancelBookingByDriver] Populating user details for notification...
+[CancelBookingByDriver] User details populated - User ID: new ObjectId('690f199ac08d580e05620dd4')
+[CancelBookingByDriver] Sending cancellation notification to user...
+✅ Push notification sent successfully: projects/resq-7cd08/messages/0:1763288306253101%c0bf50c8c0bf50c8
+Notification created: booking_cancelled - Booking Cancelled
+[CancelBookingByDriver] ✅ Notification sent successfully
+[CancelBookingByDriver] Emitting socket event for booking update...
+
+📢 [Socket Emit] booking:status:update
+   Booking ID: 6919a4daf79201df2c3e3b53
+   New Status: cancelled_by_driver
+   User ID: {
+  profile: { profileImage: null },
+  _id: new ObjectId('690f199ac08d580e05620dd4'),
+  phoneNumber: '+919656832396',
+  fcmToken: 'cESLcPKWTVWqUEPHRbuF-w:APA91bFhDsmRTtvsabqBYF0untR6yxRMvE4ML8OQouAyAAu8_KGJEoWXB2MkO5n_XOgS1A9bbQKbcz5pgYdGKxrJLWqT9QRw2msDpg5HLslsmz_7KVlJGoc',
+  fullName: 'undefined undefined',
+  id: '690f199ac08d580e05620dd4'
+}
+   Driver ID: 690f0e1a482c36296774fe6e
+   ✅ Emitted to user room: user:{
+  profile: { profileImage: null },
+  _id: new ObjectId('690f199ac08d580e05620dd4'),
+  phoneNumber: '+919656832396',
+  fcmToken: 'cESLcPKWTVWqUEPHRbuF-w:APA91bFhDsmRTtvsabqBYF0untR6yxRMvE4ML8OQouAyAAu8_KGJEoWXB2MkO5n_XOgS1A9bbQKbcz5pgYdGKxrJLWqT9QRw2msDpg5HLslsmz_7KVlJGoc',
+  fullName: 'undefined undefined',
+  id: '690f199ac08d580e05620dd4'
+}
+   ✅ Emitted to driver room: driver:690f0e1a482c36296774fe6e
+   ✅ Emitted to booking room: booking:6919a4daf79201df2c3e3b53
+   Payload: {
+  "bookingId": "6919a4daf79201df2c3e3b53",
+  "status": "cancelled_by_driver",
+  "timeline": {
+    "requestedAt": "2025-11-16T10:18:02.559Z",
+    "acceptedAt": "2025-11-16T10:18:05.161Z",
+    "paymentCompletedAt": "2025-11-16T10:18:05.161Z",
+    "cancelledAt": "2025-11-16T10:18:26.049Z"
+  }
+}
+[CancelBookingByDriver] ✅ Socket event emitted successfully
+[CancelBookingByDriver] Preparing response...
+[CancelBookingByDriver] Response booking payment status: refunded
+[CancelBookingByDriver] Response booking status: cancelled_by_driver
+[CancelBookingByDriver] Full booking.payment object: {
+  "status": "refunded",
+  "method": "Auto-completed (Development)",
+  "gateway": "N/A",
+  "paidAmount": 151.8,
+  "paidAt": "2025-11-16T10:18:05.161Z",
+  "gatewayResponse": {
+    "note": "Auto-completed for testing"
+  },
+  "refundStatus": "pending",
+  "refundDate": "2025-11-16T10:18:26.049Z",
+  "refundAmount": 151.8
+}
+========== DRIVER CANCELLATION COMPLETED ==========
+
+[CancelBookingByDriver] Response payment status in JSON: refunded
+PATCH /api/v1/bookings/driver/6919a4daf79201df2c3e3b53/cancel 200 272.251 ms - 2024
+PATCH /api/v1/driver/location 200 12.217 ms - 279
+
+========== GET USER ACTIVE BOOKING ==========
+[GetUserActiveBooking] User ID: new ObjectId('690f199ac08d580e05620dd4')
+[GetUserActiveBooking] Timestamp: 2025-11-16T10:18:36.531Z
+[GetUserActiveBooking] Last 5 bookings for this user:
+[
+  {
+    "_id": "6919a4daf79201df2c3e3b53",
+    "bookingNumber": "BK1763288282557265",
+    "status": "cancelled_by_driver",
+    "payment": {
+      "status": "refunded"
+    },
+    "createdAt": "2025-11-16T10:18:02.560Z"
+  }
+]
+[GetUserActiveBooking] ❌ No active booking found
+[GetUserActiveBooking] Query statuses: [
+  'requested',
+  'accepted',
+  'driver_arrived',
+  'in_progress',
+  'payment_completed'
+]
+========== END GET USER ACTIVE BOOKING ==========
+
+GET /api/v1/bookings/user/active 200 8.257 ms - 40
+PATCH /api/v1/driver/location 200 11.192 ms - 279
