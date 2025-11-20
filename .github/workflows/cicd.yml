@@ -20,7 +20,7 @@ jobs:
           rm -rf node_modules .git
 
       - name: Rsync files
-        uses: burnett01/rsync-deployments@v2
+        uses: burnett01/rsync-deployments@7.0.2
         with:
           switches: -az --delete
           path: "./"
