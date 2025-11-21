@@ -91,6 +91,14 @@ router.patch(
   driverController.updateBankDetails
 );
 
+// Get active trip
+router.get(
+  '/bookings/active',
+  authMiddleware,
+  roleMiddleware('driver'),
+  driverController.getActiveTrip
+);
+
 /**
  * DOCUMENT UPLOAD ROUTES
  */

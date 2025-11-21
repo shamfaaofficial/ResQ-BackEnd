@@ -317,4 +317,56 @@ exports.updateBankDetails = asyncHandler(async (req, res) => {
   });
 });
 
+// Get active trip
+exports.getActiveTrip = asyncHandler(async (req, res) => {
+  const driver = await Driver.findOne({ userId: req.userId });
+  if (!driver) {
+    throw new NotFoundError('Driver profile not found');
+  }
+
+  // Check Redis cache first
+  let activeBooking = null;
+
+  if (isRedisAvailable()) {
+    const cachedBookingId = await redisService.getActiveBooking(driver._id);
+    if (cachedBookingId) {
+      activeBooking = await Booking.findById(cachedBookingId)
+        .populate('userId', 'phoneNumber profile')
+        .select('-__v');
+    }
+  }
+
+  // If not in cache, query MongoDB
+  if (!activeBooking) {
+    activeBooking = await Booking.findOne({
+      driverId: driver._id,
+      status: { $in: ['accepted', 'payment_completed', 'driver_arrived', 'in_progress'] }
+    })
+      .populate('userId', 'phoneNumber profile')
+      .select('-__v');
+
+    // Cache for future requests
+    if (activeBooking && isRedisAvailable()) {
+      await redisService.cacheActiveBooking(driver._id, activeBooking._id);
+    }
+  }
+
+  if (!activeBooking) {
+    return res.status(200).json({
+      success: true,
+      message: 'No active trip found',
+      data: {
+        activeTrip: null
+      }
+    });
+  }
+
+  res.status(200).json({
+    success: true,
+    data: {
+      activeTrip: activeBooking
+    }
+  });
+});
+
 module.exports = exports;
