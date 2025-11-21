@@ -50,14 +50,29 @@ router.get('/drivers', adminDriverController.getAllDrivers);
 // Get driver statistics (MUST be before /:driverId to avoid route conflict)
 router.get('/drivers/statistics', adminDriverController.getDriverStatistics);
 
+/**
+ * DRIVER DOCUMENT MANAGEMENT ROUTES
+ * NOTE: These routes MUST come BEFORE parameterized routes like /drivers/:driverId
+ * to avoid route matching conflicts (e.g., "documents" being interpreted as driverId)
+ */
+
+// Get all drivers with their documents (with filters)
+router.get('/drivers/documents', adminDocumentController.getAllDriverDocuments);
+
+// Get drivers with pending documents (needs review)
+router.get('/drivers/documents/pending', adminDocumentController.getPendingDocuments);
+
+// Bulk update multiple documents
+router.patch('/drivers/documents/bulk-update', adminDocumentController.bulkUpdateDocuments);
+
 // Get specific driver by ID
 router.get('/drivers/:driverId', adminDriverController.getDriverById);
 
 // Get driver earnings
 router.get('/drivers/:driverId/earnings', adminDriverController.getDriverEarnings);
 
-// Get driver documents
-router.get('/drivers/:driverId/documents', adminDriverController.getDriverDocuments);
+// Get specific driver's documents
+router.get('/drivers/:driverId/documents', adminDocumentController.getDriverDocuments);
 
 // Get driver rejection statistics
 router.get('/drivers/:driverId/rejections', adminDriverController.getDriverRejectionStats);
@@ -65,8 +80,14 @@ router.get('/drivers/:driverId/rejections', adminDriverController.getDriverRejec
 // Update driver approval status
 router.patch('/drivers/:driverId/approval', adminDriverController.updateDriverApproval);
 
-// Update document status
-router.patch('/drivers/:driverId/documents', adminDriverController.updateDocumentStatus);
+// Approve/Reject a specific document
+router.patch('/drivers/:driverId/documents/:documentId', adminDocumentController.updateDocumentStatus);
+
+// Approve driver application (approve all documents and activate account)
+router.post('/drivers/:driverId/approve', adminDocumentController.approveDriverApplication);
+
+// Reject driver application and delete account
+router.delete('/drivers/:driverId/reject', adminDocumentController.rejectDriverApplication);
 
 // Update driver details
 router.put('/drivers/:driverId', adminDriverController.updateDriver);
@@ -101,30 +122,5 @@ router.patch('/trips/:tripId/cancel', adminTripController.cancelTrip);
 
 // Update trip status (force update)
 router.patch('/trips/:tripId/status', adminTripController.updateTripStatus);
-
-/**
- * DRIVER DOCUMENT MANAGEMENT ROUTES
- */
-
-// Get all drivers with their documents (with filters)
-router.get('/drivers/documents', adminDocumentController.getAllDriverDocuments);
-
-// Get drivers with pending documents (needs review)
-router.get('/drivers/documents/pending', adminDocumentController.getPendingDocuments);
-
-// Bulk update multiple documents
-router.patch('/drivers/documents/bulk-update', adminDocumentController.bulkUpdateDocuments);
-
-// Get specific driver's documents
-router.get('/drivers/:driverId/documents', adminDocumentController.getDriverDocuments);
-
-// Approve/Reject a specific document
-router.patch('/drivers/:driverId/documents/:documentId', adminDocumentController.updateDocumentStatus);
-
-// Approve driver application (approve all documents and activate account)
-router.post('/drivers/:driverId/approve', adminDocumentController.approveDriverApplication);
-
-// Reject driver application and delete account
-router.delete('/drivers/:driverId/reject', adminDocumentController.rejectDriverApplication);
 
 module.exports = router;
