@@ -123,6 +123,82 @@ exports.getWalletBalance = asyncHandler(async (req, res) => {
   });
 });
 
+// Get wallet with user info (for display screen)
+exports.getWalletWithUserInfo = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.userId).select('profile.firstName profile.lastName wallet phoneNumber');
+
+  if (!user) {
+    throw new NotFoundError('User not found');
+  }
+
+  res.status(200).json({
+    success: true,
+    data: {
+      name: `${user.profile.firstName || ''} ${user.profile.lastName || ''}`.trim() || 'User',
+      phoneNumber: user.phoneNumber,
+      wallet: {
+        balance: user.wallet.balance,
+        currency: user.wallet.currency,
+        lastUpdated: user.wallet.lastUpdated
+      }
+    }
+  });
+});
+
+// Update wallet balance (Admin only - for adding credits)
+exports.updateWalletBalance = asyncHandler(async (req, res) => {
+  const { amount, operation } = req.body;
+
+  if (!amount || typeof amount !== 'number') {
+    throw new ValidationError('Amount must be a valid number');
+  }
+
+  if (amount <= 0) {
+    throw new ValidationError('Amount must be greater than 0');
+  }
+
+  if (!operation || !['add', 'deduct'].includes(operation)) {
+    throw new ValidationError('Operation must be either "add" or "deduct"');
+  }
+
+  const user = await User.findById(req.userId);
+
+  if (!user) {
+    throw new NotFoundError('User not found');
+  }
+
+  // Perform operation
+  if (operation === 'add') {
+    user.wallet.balance += amount;
+  } else if (operation === 'deduct') {
+    if (user.wallet.balance < amount) {
+      throw new ValidationError('Insufficient wallet balance');
+    }
+    user.wallet.balance -= amount;
+  }
+
+  user.wallet.lastUpdated = new Date();
+  await user.save();
+
+  res.status(200).json({
+    success: true,
+    message: `Wallet ${operation === 'add' ? 'credited' : 'debited'} successfully`,
+    data: {
+      wallet: {
+        balance: user.wallet.balance,
+        currency: user.wallet.currency,
+        lastUpdated: user.wallet.lastUpdated
+      },
+      transaction: {
+        amount: amount,
+        operation: operation,
+        previousBalance: operation === 'add' ? user.wallet.balance - amount : user.wallet.balance + amount,
+        newBalance: user.wallet.balance
+      }
+    }
+  });
+});
+
 // Change password
 exports.changePassword = asyncHandler(async (req, res) => {
   const { currentPassword, newPassword } = req.body;

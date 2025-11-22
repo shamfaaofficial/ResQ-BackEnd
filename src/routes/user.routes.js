@@ -33,6 +33,22 @@ router.get(
   userController.getWalletBalance
 );
 
+// Get wallet with user info - for display screen (protected - user only)
+router.get(
+  '/wallet/display',
+  authMiddleware,
+  roleMiddleware('user'),
+  userController.getWalletWithUserInfo
+);
+
+// Update wallet balance (protected - user only)
+router.patch(
+  '/wallet',
+  authMiddleware,
+  roleMiddleware('user'),
+  userController.updateWalletBalance
+);
+
 // Change password (protected - user only)
 router.patch(
   '/change-password',
