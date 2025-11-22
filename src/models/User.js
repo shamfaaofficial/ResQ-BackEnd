@@ -73,6 +73,21 @@ const userSchema = new mongoose.Schema({
   fcmToken: {
     type: String,
     default: null
+  },
+  wallet: {
+    balance: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    currency: {
+      type: String,
+      default: 'QAR'
+    },
+    lastUpdated: {
+      type: Date,
+      default: Date.now
+    }
   }
 }, {
   timestamps: true
