@@ -950,6 +950,8 @@ exports.acceptBooking = asyncHandler(async (req, res) => {
     paidAt: new Date(),
     gatewayResponse: { note: 'Auto-completed for testing' }
   };
+  // IMPORTANT: Clear payment expiry since payment is already completed
+  booking.paymentExpiresAt = null;
 
   // Generate 4-digit verification code immediately (for user to see in advance)
   const verificationCode = Math.floor(1000 + Math.random() * 9000).toString();
