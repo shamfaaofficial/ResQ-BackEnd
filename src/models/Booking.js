@@ -210,7 +210,10 @@ const bookingSchema = new mongoose.Schema({
 bookingSchema.index({ userId: 1, status: 1 });
 bookingSchema.index({ driverId: 1, status: 1 });
 bookingSchema.index({ status: 1, createdAt: -1 });
-bookingSchema.index({ requestExpiresAt: 1 }, { expireAfterSeconds: 0 });
+// REMOVED TTL index - it was auto-deleting ALL bookings after 60 seconds, including active trips
+// We use the cron job in booking.job.js instead for controlled expiry logic
+// bookingSchema.index({ requestExpiresAt: 1 }, { expireAfterSeconds: 0 });
+bookingSchema.index({ requestExpiresAt: 1 }); // Keep regular index for query performance
 bookingSchema.index({ pickupLocation: '2dsphere' });
 
 // Virtual for total trip time
