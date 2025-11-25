@@ -1122,6 +1122,119 @@ exports.markDriverArrived = asyncHandler(async (req, res) => {
   });
 });
 
+// Verify pickup code (driver enters code provided by user)
+exports.verifyPickupCode = asyncHandler(async (req, res) => {
+  const { bookingId } = req.params;
+  const { verificationCode } = req.body;
+
+  console.log('\n========== VERIFY PICKUP CODE ==========');
+  console.log('[VerifyPickupCode] Booking ID:', bookingId);
+  console.log('[VerifyPickupCode] Code entered by driver:', verificationCode);
+
+  if (!verificationCode) {
+    throw new ValidationError('Verification code is required');
+  }
+
+  const driver = await Driver.findOne({ userId: req.userId });
+  if (!driver) {
+    throw new NotFoundError('Driver profile not found');
+  }
+
+  const booking = await Booking.findOne({
+    _id: bookingId,
+    driverId: driver._id
+  });
+
+  if (!booking) {
+    console.log('[VerifyPickupCode] ❌ Booking not found');
+    throw new NotFoundError('Booking not found');
+  }
+
+  console.log('[VerifyPickupCode] Current booking status:', booking.status);
+  console.log('[VerifyPickupCode] Stored verification code:', booking.verificationCode?.code);
+  console.log('[VerifyPickupCode] Is already verified?', booking.verificationCode?.isVerified);
+
+  // Check booking status - must be driver_arrived
+  if (booking.status !== BOOKING_STATUS.DRIVER_ARRIVED) {
+    console.log('[VerifyPickupCode] ❌ Invalid status for verification');
+    throw new ValidationError('Can only verify code after driver has arrived at pickup');
+  }
+
+  // Check if code exists
+  if (!booking.verificationCode?.code) {
+    console.log('[VerifyPickupCode] ❌ No verification code found in booking');
+    throw new ValidationError('No verification code found for this booking');
+  }
+
+  // Check if already verified
+  if (booking.verificationCode.isVerified) {
+    console.log('[VerifyPickupCode] ⚠️ Code already verified');
+    return res.status(200).json({
+      success: true,
+      message: 'Verification code already verified',
+      data: {
+        verified: true,
+        verifiedAt: booking.verificationCode.verifiedAt
+      }
+    });
+  }
+
+  // Verify the code
+  if (booking.verificationCode.code !== verificationCode.toString().trim()) {
+    console.log('[VerifyPickupCode] ❌ Code mismatch');
+    console.log('[VerifyPickupCode] Expected:', booking.verificationCode.code);
+    console.log('[VerifyPickupCode] Received:', verificationCode.toString().trim());
+    throw new ValidationError('Invalid verification code');
+  }
+
+  // Mark code as verified
+  booking.verificationCode.isVerified = true;
+  booking.verificationCode.verifiedAt = new Date();
+  await booking.save();
+
+  console.log('[VerifyPickupCode] ✅ Code verified successfully');
+
+  // Populate for response
+  await booking.populate('userId', 'phoneNumber profile');
+
+  // Send notification to user that driver has verified pickup
+  try {
+    await notificationService.sendNotification(
+      booking.userId._id,
+      'Pickup Verified',
+      'Driver has verified the pickup code and will start the trip shortly',
+      'pickup_verified',
+      { bookingId: booking._id }
+    );
+    console.log('[VerifyPickupCode] Notification sent to user');
+  } catch (notifError) {
+    console.error('[VerifyPickupCode] Failed to send notification:', notifError.message);
+  }
+
+  // Emit Socket.IO event
+  try {
+    emitBookingUpdate(booking);
+  } catch (error) {
+    console.error('[VerifyPickupCode] Failed to emit socket event:', error.message);
+  }
+
+  console.log('========== END VERIFY PICKUP CODE ==========\n');
+
+  res.status(200).json({
+    success: true,
+    message: 'Pickup code verified successfully. You can now start the trip.',
+    data: {
+      verified: true,
+      verifiedAt: booking.verificationCode.verifiedAt,
+      booking: {
+        id: booking._id,
+        bookingNumber: booking.bookingNumber,
+        status: booking.status
+      }
+    }
+  });
+});
+
 // Start trip
 exports.startTrip = asyncHandler(async (req, res) => {
   const { bookingId } = req.params;

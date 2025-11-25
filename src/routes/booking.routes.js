@@ -131,6 +131,14 @@ router.patch(
   bookingController.markDriverArrived
 );
 
+// Verify pickup code (protected - driver only)
+router.post(
+  '/driver/:bookingId/verify-pickup',
+  authMiddleware,
+  roleMiddleware('driver'),
+  bookingController.verifyPickupCode
+);
+
 // Start trip (protected - driver only)
 router.patch(
   '/driver/:bookingId/start',
