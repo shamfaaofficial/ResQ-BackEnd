@@ -1217,6 +1217,35 @@ exports.completeTrip = asyncHandler(async (req, res) => {
   driver.earnings.availableBalance += booking.driverEarnings;
   await driver.save();
 
+  // Populate user and driver details for notifications
+  await booking.populate('userId', 'phoneNumber profile fcmToken');
+  await driver.populate('userId', 'phoneNumber profile');
+
+  // Send notification to user about trip completion
+  const driverName = driver.userId?.profile?.firstName && driver.userId?.profile?.lastName
+    ? `${driver.userId.profile.firstName} ${driver.userId.profile.lastName}`
+    : driver.userId?.phoneNumber || 'Driver';
+
+  try {
+    await notificationService.sendNotification(
+      booking.userId._id,
+      'Trip Completed',
+      `Your trip with ${driverName} has been completed successfully! Amount: ${booking.pricing.totalAmount} ${booking.pricing.currency}`,
+      'trip_completed',
+      {
+        bookingId: booking._id,
+        bookingNumber: booking.bookingNumber,
+        totalAmount: booking.pricing.totalAmount,
+        currency: booking.pricing.currency,
+        driverName: driverName
+      }
+    );
+    console.log('[CompleteTrip] Trip completion notification sent to user');
+  } catch (notifError) {
+    console.error('[CompleteTrip] Failed to send notification to user:', notifError.message);
+    // Don't fail the trip completion if notification fails
+  }
+
   // Emit Socket.IO event for real-time update
   try {
     emitBookingUpdate(booking);
