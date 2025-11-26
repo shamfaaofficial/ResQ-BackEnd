@@ -1429,6 +1429,43 @@ exports.completeTrip = asyncHandler(async (req, res) => {
     throw new ValidationError('Trip must be in progress to complete');
   }
 
+  // SECURITY: Validate driver is near dropoff location before allowing completion
+  const { DROPOFF_PROXIMITY_THRESHOLD_METERS } = require('../config/constants');
+
+  if (actualDropoffLocation?.coordinates) {
+    // Validate driver's actual location is within acceptable range of planned dropoff
+    const distanceToDropoff = await mapsService.calculateDistance(
+      { lat: actualDropoffLocation.coordinates[1], lng: actualDropoffLocation.coordinates[0] },
+      { lat: booking.dropoffLocation.coordinates[1], lng: booking.dropoffLocation.coordinates[0] }
+    );
+
+    if (distanceToDropoff.distance > DROPOFF_PROXIMITY_THRESHOLD_METERS) {
+      throw new ValidationError(
+        `You must be within ${DROPOFF_PROXIMITY_THRESHOLD_METERS}m of the dropoff location to complete the trip. Current distance: ${Math.round(distanceToDropoff.distance)}m`
+      );
+    }
+
+    console.log(`[CompleteTrip] Location validated - Driver is ${Math.round(distanceToDropoff.distance)}m from dropoff location`);
+  } else {
+    // If no actual location provided, use driver's current location
+    if (!driver.currentLocation?.coordinates) {
+      throw new ValidationError('Driver location not available. Please enable location services.');
+    }
+
+    const distanceToDropoff = await mapsService.calculateDistance(
+      { lat: driver.currentLocation.coordinates[1], lng: driver.currentLocation.coordinates[0] },
+      { lat: booking.dropoffLocation.coordinates[1], lng: booking.dropoffLocation.coordinates[0] }
+    );
+
+    if (distanceToDropoff.distance > DROPOFF_PROXIMITY_THRESHOLD_METERS) {
+      throw new ValidationError(
+        `You must be within ${DROPOFF_PROXIMITY_THRESHOLD_METERS}m of the dropoff location to complete the trip. Current distance: ${Math.round(distanceToDropoff.distance)}m`
+      );
+    }
+
+    console.log(`[CompleteTrip] Location validated - Driver is ${Math.round(distanceToDropoff.distance)}m from dropoff location`);
+  }
+
   // Update actual dropoff location if provided
   if (actualDropoffLocation?.coordinates) {
     booking.actualDropoffLocation = {
