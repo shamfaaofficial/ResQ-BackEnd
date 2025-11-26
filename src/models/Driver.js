@@ -110,6 +110,10 @@ const driverSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  isBusy: {
+    type: Boolean,
+    default: false
+  },
   currentLocation: {
     type: {
       type: String,
@@ -175,12 +179,12 @@ const driverSchema = new mongoose.Schema({
 // Create 2dsphere index for geospatial queries
 driverSchema.index({ currentLocation: '2dsphere' });
 // userId already has unique index from schema definition
-driverSchema.index({ approvalStatus: 1, isOnline: 1 });
+driverSchema.index({ approvalStatus: 1, isOnline: 1, isBusy: 1 });
 // Compound index for nearby driver queries (online + location)
 driverSchema.index({ isOnline: 1, currentLocation: '2dsphere' });
 
 // Method to update location
-driverSchema.methods.updateLocation = function(longitude, latitude, address) {
+driverSchema.methods.updateLocation = function (longitude, latitude, address) {
   this.currentLocation.coordinates = [longitude, latitude];
   this.currentLocation.address = address;
   this.currentLocation.lastUpdated = new Date();
@@ -188,10 +192,11 @@ driverSchema.methods.updateLocation = function(longitude, latitude, address) {
 };
 
 // Method to check if driver can accept bookings
-driverSchema.methods.canAcceptBookings = function() {
+driverSchema.methods.canAcceptBookings = function () {
   return this.approvalStatus === APPROVAL_STATUS.APPROVED &&
-         this.isOnline &&
-         this.isLocationEnabled;
+    this.isOnline &&
+    !this.isBusy &&
+    this.isLocationEnabled;
 };
 
 module.exports = mongoose.model('Driver', driverSchema);

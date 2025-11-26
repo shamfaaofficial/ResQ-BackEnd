@@ -42,12 +42,13 @@ exports.getNearbyDrivers = asyncHandler(async (req, res) => {
 
         const drivers = await Driver.find({
           _id: { $in: driverIds },
-          isOnline: true
+          isOnline: true,
+          isBusy: false
           // Note: Removed approvalStatus check temporarily as per earlier request
         })
-        .populate('userId', 'phoneNumber profile')
-        .select('userId vehicleDetails currentLocation rating isOnline')
-        .lean();
+          .populate('userId', 'phoneNumber profile')
+          .select('userId vehicleDetails currentLocation rating isOnline')
+          .lean();
 
         // Map drivers with distance from Redis
         nearbyDrivers = drivers.map(driver => {
@@ -86,6 +87,7 @@ exports.getNearbyDrivers = asyncHandler(async (req, res) => {
 
       const drivers = await Driver.find({
         isOnline: true,
+        isBusy: false,
         isLocationEnabled: true,
         // approvalStatus: 'approved', // Commented out as per earlier request
         currentLocation: {
@@ -98,10 +100,10 @@ exports.getNearbyDrivers = asyncHandler(async (req, res) => {
           }
         }
       })
-      .populate('userId', 'phoneNumber profile')
-      .select('userId vehicleDetails currentLocation rating isOnline')
-      .limit(20)
-      .lean();
+        .populate('userId', 'phoneNumber profile')
+        .select('userId vehicleDetails currentLocation rating isOnline')
+        .limit(20)
+        .lean();
 
       console.log(`[Booking] Found ${drivers.length} nearby drivers in MongoDB`);
 
@@ -187,6 +189,24 @@ exports.createBooking = asyncHandler(async (req, res) => {
     vehicleType,
     notes
   } = req.body;
+
+  // Check if user already has an active booking
+  const activeBooking = await Booking.findOne({
+    userId: req.userId,
+    status: {
+      $in: [
+        BOOKING_STATUS.REQUESTED,
+        BOOKING_STATUS.ACCEPTED,
+        BOOKING_STATUS.DRIVER_ARRIVED,
+        BOOKING_STATUS.IN_PROGRESS,
+        BOOKING_STATUS.PAYMENT_COMPLETED
+      ]
+    }
+  });
+
+  if (activeBooking) {
+    throw new ValidationError('You already have an active booking. Please complete or cancel it first.');
+  }
 
   // Validate required fields
   if (!pickupLocation?.coordinates || !dropoffLocation?.coordinates || !vehicleType) {
@@ -298,12 +318,12 @@ exports.getUserActiveBooking = asyncHandler(async (req, res) => {
       ]
     }
   })
-  .populate('userId', 'phoneNumber profile')
-  .populate({
-    path: 'driverId',
-    populate: { path: 'userId', select: 'phoneNumber profile' }
-  })
-  .sort({ createdAt: -1 });
+    .populate('userId', 'phoneNumber profile')
+    .populate({
+      path: 'driverId',
+      populate: { path: 'userId', select: 'phoneNumber profile' }
+    })
+    .sort({ createdAt: -1 });
 
   if (booking) {
     console.log('[GetUserActiveBooking] ✅ Found active booking:', booking.bookingNumber);
@@ -354,11 +374,11 @@ exports.getBookingStatus = asyncHandler(async (req, res) => {
     _id: bookingId,
     userId: req.userId
   })
-  .populate({
-    path: 'driverId',
-    populate: { path: 'userId', select: 'phoneNumber profile' }
-  })
-  .select('bookingNumber status payment timeline cancellationDetails driverId pricing');
+    .populate({
+      path: 'driverId',
+      populate: { path: 'userId', select: 'phoneNumber profile' }
+    })
+    .select('bookingNumber status payment timeline cancellationDetails driverId pricing');
 
   if (!booking) {
     console.log('[GetBookingStatus] ❌ Booking not found');
@@ -406,11 +426,11 @@ exports.getBookingLiveStatus = asyncHandler(async (req, res) => {
     _id: bookingId,
     userId: req.userId
   })
-  .populate('userId', 'phoneNumber profile')
-  .populate({
-    path: 'driverId',
-    populate: { path: 'userId', select: 'phoneNumber profile' }
-  });
+    .populate('userId', 'phoneNumber profile')
+    .populate({
+      path: 'driverId',
+      populate: { path: 'userId', select: 'phoneNumber profile' }
+    });
 
   if (!booking) {
     throw new NotFoundError('Booking not found');
@@ -591,14 +611,20 @@ exports.cancelBooking = asyncHandler(async (req, res) => {
   if (booking.driverId) {
     try {
       const driver = await Driver.findById(booking.driverId).populate('userId', 'fcmToken');
-      if (driver && driver.userId) {
-        await notificationService.sendNotification(
-          driver.userId._id,
-          'Booking Cancelled',
-          `User cancelled the booking. Reason: ${reason || 'No reason provided'}`,
-          'booking_cancelled',
-          { bookingId: booking._id, cancelledBy: 'user', reason: reason }
-        );
+      if (driver) {
+        // Mark driver as not busy
+        driver.isBusy = false;
+        await driver.save();
+
+        if (driver.userId) {
+          await notificationService.sendNotification(
+            driver.userId._id,
+            'Booking Cancelled',
+            `User cancelled the booking. Reason: ${reason || 'No reason provided'}`,
+            'booking_cancelled',
+            { bookingId: booking._id, cancelledBy: 'user', reason: reason }
+          );
+        }
       }
     } catch (notifError) {
       console.error('[CancelBooking] Failed to notify driver:', notifError.message);
@@ -680,6 +706,13 @@ exports.userForceCancel = asyncHandler(async (req, res) => {
     // Send notification to driver
     if (booking.driverId && booking.driverId.userId) {
       try {
+        // Mark driver as not busy
+        const driver = await Driver.findById(booking.driverId);
+        if (driver) {
+          driver.isBusy = false;
+          await driver.save();
+        }
+
         await notificationService.sendNotification(
           booking.driverId.userId._id,
           'Booking Cancelled',
@@ -778,9 +811,9 @@ exports.getAvailableBookings = asyncHandler(async (req, res) => {
       }
     }
   })
-  .populate('userId', 'phoneNumber profile')
-  .sort({ createdAt: -1 })
-  .limit(10);
+    .populate('userId', 'phoneNumber profile')
+    .sort({ createdAt: -1 })
+    .limit(10);
 
   // Format bookings with enhanced details
   const formattedBookings = await Promise.all(bookings.map(async (booking) => {
@@ -1022,6 +1055,10 @@ exports.acceptBooking = asyncHandler(async (req, res) => {
     booking.timeline.acceptedAt = booking.timeline.acceptedAt || new Date();
   }
 
+  // Mark driver as busy
+  driver.isBusy = true;
+  await driver.save();
+
   // Set payment expiry after acceptance (user should pay within 5 minutes)
   booking.paymentExpiresAt = new Date(Date.now() + PAYMENT_TIMEOUT_SECONDS * 1000);
 
@@ -1122,8 +1159,8 @@ exports.getDriverActiveBooking = asyncHandler(async (req, res) => {
       ]
     }
   })
-  .populate('userId', 'phoneNumber profile')
-  .sort({ createdAt: -1 });
+    .populate('userId', 'phoneNumber profile')
+    .sort({ createdAt: -1 });
 
   if (!booking) {
     return res.status(200).json({
@@ -1421,6 +1458,7 @@ exports.completeTrip = asyncHandler(async (req, res) => {
   // Update driver earnings
   driver.earnings.totalEarnings += booking.driverEarnings;
   driver.earnings.availableBalance += booking.driverEarnings;
+  driver.isBusy = false; // Driver is now available
   await driver.save();
 
   // Populate user and driver details for notifications
@@ -1595,6 +1633,12 @@ exports.cancelBookingByDriver = asyncHandler(async (req, res) => {
 
   console.log('[CancelBookingByDriver] Saving booking with updated status...');
   await booking.save();
+
+  // Mark driver as not busy
+  if (driver) {
+    driver.isBusy = false;
+    await driver.save();
+  }
   console.log('[CancelBookingByDriver] ✅ Booking saved successfully');
   console.log('[CancelBookingByDriver] Final booking status:', booking.status);
   console.log('[CancelBookingByDriver] Final payment status:', booking.payment.status);
@@ -1895,7 +1939,7 @@ exports.requestSpecificDriver = asyncHandler(async (req, res) => {
 
   // Validate coordinates format
   if (!Array.isArray(pickupLocation.coordinates) || pickupLocation.coordinates.length !== 2 ||
-      !Array.isArray(dropoffLocation.coordinates) || dropoffLocation.coordinates.length !== 2) {
+    !Array.isArray(dropoffLocation.coordinates) || dropoffLocation.coordinates.length !== 2) {
     throw new ValidationError('Invalid coordinates format. Expected [longitude, latitude]');
   }
 

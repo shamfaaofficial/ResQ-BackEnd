@@ -70,6 +70,15 @@ cron.schedule('* * * * *', async () => {
         'Payment timeout - booking cancelled',
         'system'
       );
+
+      // Mark driver as not busy if assigned
+      if (booking.driverId) {
+        const driver = await require('../models/Driver').findById(booking.driverId);
+        if (driver) {
+          driver.isBusy = false;
+          await driver.save();
+        }
+      }
     }
 
     if (expiredRequests.length > 0 || expiredPayments.length > 0) {
