@@ -230,6 +230,7 @@ module.exports = {
   cacheActiveBooking,
   getActiveBooking,
   removeActiveBooking,
+  clearActiveBooking: removeActiveBooking, // Alias for removeActiveBooking
   getOnlineDriversCount,
   shouldSyncToMongoDB,
   getAllOnlineDriverIds

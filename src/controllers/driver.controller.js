@@ -324,30 +324,57 @@ exports.getActiveTrip = asyncHandler(async (req, res) => {
     throw new NotFoundError('Driver profile not found');
   }
 
+  const { BOOKING_STATUS } = require('../config/constants');
+
   // Check Redis cache first
   let activeBooking = null;
 
   if (isRedisAvailable()) {
     const cachedBookingId = await redisService.getActiveBooking(driver._id);
     if (cachedBookingId) {
-      activeBooking = await Booking.findById(cachedBookingId)
+      const cachedBooking = await Booking.findById(cachedBookingId)
         .populate('userId', 'phoneNumber profile')
         .select('-__v');
+
+      // CRITICAL: Validate cached booking is still active
+      if (cachedBooking && [
+        BOOKING_STATUS.ACCEPTED,
+        BOOKING_STATUS.PAYMENT_COMPLETED,
+        BOOKING_STATUS.DRIVER_ARRIVED,
+        BOOKING_STATUS.IN_PROGRESS
+      ].includes(cachedBooking.status)) {
+        activeBooking = cachedBooking;
+      } else {
+        // Booking completed/cancelled - clear stale cache
+        console.log('[GetActiveTrip] Clearing stale Redis cache for driver:', driver._id);
+        await redisService.clearActiveBooking(driver._id);
+      }
     }
   }
 
-  // If not in cache, query MongoDB
+  // If not in cache or cache was invalid, query MongoDB
   if (!activeBooking) {
     activeBooking = await Booking.findOne({
       driverId: driver._id,
-      status: { $in: ['accepted', 'payment_completed', 'driver_arrived', 'in_progress'] }
+      status: {
+        $in: [
+          BOOKING_STATUS.ACCEPTED,
+          BOOKING_STATUS.PAYMENT_COMPLETED,
+          BOOKING_STATUS.DRIVER_ARRIVED,
+          BOOKING_STATUS.IN_PROGRESS
+        ]
+      }
     })
       .populate('userId', 'phoneNumber profile')
-      .select('-__v');
+      .select('-__v')
+      .sort({ createdAt: -1 }); // Get latest if multiple exist
 
     // Cache for future requests
     if (activeBooking && isRedisAvailable()) {
       await redisService.cacheActiveBooking(driver._id, activeBooking._id);
+    } else if (!activeBooking && isRedisAvailable()) {
+      // No active booking - ensure cache is cleared
+      await redisService.clearActiveBooking(driver._id);
     }
   }
 

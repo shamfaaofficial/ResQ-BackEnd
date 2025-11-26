@@ -1491,6 +1491,17 @@ exports.completeTrip = asyncHandler(async (req, res) => {
     // Don't fail the trip completion if notification fails
   }
 
+  // Clear Redis cache for active booking
+  const { isRedisAvailable } = require('../config/redis');
+  if (isRedisAvailable()) {
+    try {
+      await redisService.clearActiveBooking(driver._id);
+      console.log('[CompleteTrip] Cleared Redis cache for driver:', driver._id);
+    } catch (redisError) {
+      console.error('[CompleteTrip] Failed to clear Redis cache:', redisError.message);
+    }
+  }
+
   // Emit Socket.IO event for real-time update
   try {
     emitBookingUpdate(booking);
@@ -1743,14 +1754,25 @@ exports.forceComplete = asyncHandler(async (req, res) => {
 
   await booking.save();
 
-  // Update driver earnings
+  // Update driver earnings and set as not busy
   driver.earnings.totalEarnings += booking.driverEarnings;
   driver.earnings.availableBalance += booking.driverEarnings;
+  driver.isBusy = false; // Driver is now available
   await driver.save();
 
   console.log('[ForceComplete] ✅ Booking force completed successfully');
   console.log('[ForceComplete] Driver earnings:', booking.driverEarnings);
   console.log('[ForceComplete] Platform commission:', booking.platformCommission);
+
+  // Clear Redis cache for active booking
+  if (isRedisAvailable()) {
+    try {
+      await redisService.clearActiveBooking(driver._id);
+      console.log('[ForceComplete] Cleared Redis cache for driver:', driver._id);
+    } catch (redisError) {
+      console.error('[ForceComplete] Failed to clear Redis cache:', redisError.message);
+    }
+  }
 
   // Populate user and driver details
   await booking.populate('userId', 'phoneNumber profile fcmToken');
