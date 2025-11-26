@@ -1154,12 +1154,6 @@ exports.verifyPickupCode = asyncHandler(async (req, res) => {
   console.log('[VerifyPickupCode] Stored verification code:', booking.verificationCode?.code);
   console.log('[VerifyPickupCode] Is already verified?', booking.verificationCode?.isVerified);
 
-  // Check if driver has marked arrival
-  if (booking.status !== BOOKING_STATUS.DRIVER_ARRIVED) {
-    console.log('[VerifyPickupCode] ❌ Driver must mark arrival first');
-    throw new ValidationError('Please mark your arrival at pickup location first');
-  }
-
   // Check if code exists
   if (!booking.verificationCode?.code) {
     console.log('[VerifyPickupCode] ❌ No verification code found in booking');
@@ -1190,6 +1184,15 @@ exports.verifyPickupCode = asyncHandler(async (req, res) => {
   // Mark code as verified
   booking.verificationCode.isVerified = true;
   booking.verificationCode.verifiedAt = new Date();
+
+  // IMPORTANT: Automatically mark driver as arrived when code is verified
+  // The act of verifying the code confirms driver has physically arrived
+  if (booking.status === BOOKING_STATUS.PAYMENT_COMPLETED) {
+    booking.status = BOOKING_STATUS.DRIVER_ARRIVED;
+    booking.timeline.driverArrivedAt = new Date();
+    console.log('[VerifyPickupCode] ✅ Auto-marking driver as ARRIVED (code verification confirms arrival)');
+  }
+
   await booking.save();
 
   console.log('[VerifyPickupCode] ✅ Code verified successfully');
