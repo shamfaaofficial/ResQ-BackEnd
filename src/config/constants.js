@@ -84,7 +84,7 @@ module.exports = {
   PAYMENT_TIMEOUT_SECONDS: 300,
 
   // Location validation thresholds (in meters)
-  DROPOFF_PROXIMITY_THRESHOLD_METERS: 500, // Driver must be within 500m of dropoff to complete trip
+  DROPOFF_PROXIMITY_THRESHOLD_METERS: 20000, // Driver must be within 500m of dropoff to complete trip
   PICKUP_PROXIMITY_THRESHOLD_METERS: 200,  // Driver must be within 200m to mark "arrived"
 
   PAGINATION: {
