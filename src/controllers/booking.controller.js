@@ -1359,7 +1359,8 @@ exports.verifyPickupCode = asyncHandler(async (req, res) => {
       booking: {
         id: booking._id,
         bookingNumber: booking.bookingNumber,
-        status: booking.status
+        status: booking.status,
+        dropoffLocation: booking.dropoffLocation
       }
     }
   });
