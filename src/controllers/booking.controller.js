@@ -1154,10 +1154,10 @@ exports.verifyPickupCode = asyncHandler(async (req, res) => {
   console.log('[VerifyPickupCode] Stored verification code:', booking.verificationCode?.code);
   console.log('[VerifyPickupCode] Is already verified?', booking.verificationCode?.isVerified);
 
-  // Check booking status - must be driver_arrived
+  // Check if driver has marked arrival
   if (booking.status !== BOOKING_STATUS.DRIVER_ARRIVED) {
-    console.log('[VerifyPickupCode] ❌ Invalid status for verification');
-    throw new ValidationError('Can only verify code after driver has arrived at pickup');
+    console.log('[VerifyPickupCode] ❌ Driver must mark arrival first');
+    throw new ValidationError('Please mark your arrival at pickup location first');
   }
 
   // Check if code exists
@@ -1202,11 +1202,11 @@ exports.verifyPickupCode = asyncHandler(async (req, res) => {
     await notificationService.sendNotification(
       booking.userId._id,
       'Pickup Verified',
-      'Driver has verified the pickup code and will start the trip shortly',
+      'Driver has verified the pickup code. Your trip will start shortly.',
       'pickup_verified',
       { bookingId: booking._id }
     );
-    console.log('[VerifyPickupCode] Notification sent to user');
+    console.log('[VerifyPickupCode] Pickup verified notification sent to user');
   } catch (notifError) {
     console.error('[VerifyPickupCode] Failed to send notification:', notifError.message);
   }
