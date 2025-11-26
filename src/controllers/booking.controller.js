@@ -64,7 +64,13 @@ exports.getNearbyDrivers = asyncHandler(async (req, res) => {
             vehicleNumber: driver.vehicleDetails?.vehicleNumber,
             rating: driver.rating?.average || 0,
             totalRatings: driver.rating?.totalRatings || 0,
-            distance: redisData ? redisData.distance : null
+            vehicleNumber: driver.vehicleDetails?.vehicleNumber,
+            rating: driver.rating?.average || 0,
+            totalRatings: driver.rating?.totalRatings || 0,
+            distance: redisData ? redisData.distance : null,
+            name: driver.userId?.profile?.firstName
+              ? `${driver.userId.profile.firstName} ${driver.userId.profile.lastName || ''}`.trim()
+              : 'Driver'
           };
         });
 
@@ -118,7 +124,12 @@ exports.getNearbyDrivers = asyncHandler(async (req, res) => {
         vehicleNumber: driver.vehicleDetails?.vehicleNumber,
         rating: driver.rating?.average || 0,
         totalRatings: driver.rating?.totalRatings || 0,
-        distance: null
+        rating: driver.rating?.average || 0,
+        totalRatings: driver.rating?.totalRatings || 0,
+        distance: null,
+        name: driver.userId?.profile?.firstName
+          ? `${driver.userId.profile.firstName} ${driver.userId.profile.lastName || ''}`.trim()
+          : 'Driver'
       }));
     } catch (mongoError) {
       console.error('[Booking] MongoDB geospatial query failed:', mongoError);
