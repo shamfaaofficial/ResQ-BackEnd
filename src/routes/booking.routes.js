@@ -155,6 +155,14 @@ router.patch(
   bookingController.cancelBookingByDriver
 );
 
+// ⚠️ TESTING ONLY: Force cancel ongoing trip (allows in_progress cancellation)
+router.patch(
+  '/driver/:bookingId/force-cancel',
+  authMiddleware,
+  roleMiddleware('driver'),
+  bookingController.forceCancel
+);
+
 // Get driver's booking history (protected - driver only)
 router.get(
   '/driver/history',

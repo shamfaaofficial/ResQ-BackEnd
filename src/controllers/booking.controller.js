@@ -1412,6 +1412,95 @@ exports.cancelBookingByDriver = asyncHandler(async (req, res) => {
   res.status(200).json(responseData);
 });
 
+// ⚠️ TESTING ONLY: Force cancel ongoing trip (allows cancelling in_progress trips)
+// WARNING: This is for testing purposes only and should NOT be used in production
+exports.forceCancel = asyncHandler(async (req, res) => {
+  const { bookingId } = req.params;
+  const { reason } = req.body;
+
+  console.log('\n========== FORCE CANCEL (TESTING ONLY) ==========');
+  console.log('[ForceCancel] Booking ID:', bookingId);
+  console.log('[ForceCancel] Reason:', reason);
+
+  const driver = await Driver.findOne({ userId: req.userId });
+  if (!driver) {
+    throw new NotFoundError('Driver profile not found');
+  }
+
+  const booking = await Booking.findOne({
+    _id: bookingId,
+    driverId: driver._id
+  });
+
+  if (!booking) {
+    throw new NotFoundError('Booking not found or not assigned to you');
+  }
+
+  console.log('[ForceCancel] Current booking status:', booking.status);
+
+  // Only block if already cancelled or completed
+  if ([BOOKING_STATUS.COMPLETED, BOOKING_STATUS.CANCELLED_BY_USER, BOOKING_STATUS.CANCELLED_BY_DRIVER].includes(booking.status)) {
+    throw new ValidationError('Booking already completed or cancelled');
+  }
+
+  // ⚠️ TESTING: Allow cancelling IN_PROGRESS trips
+  console.log('[ForceCancel] ⚠️ TESTING MODE: Allowing cancellation of in_progress trip');
+
+  const { PAYMENT_STATUS } = require('../config/constants');
+
+  // Handle refund for completed payments
+  if (booking.payment?.status === PAYMENT_STATUS.COMPLETED || booking.payment?.status === 'completed') {
+    console.log('[ForceCancel] Payment was COMPLETED - marking for REFUND');
+    booking.payment.status = PAYMENT_STATUS.REFUNDED;
+    booking.payment.refundStatus = 'pending';
+    booking.payment.refundDate = new Date();
+    booking.payment.refundAmount = booking.payment.paidAmount || booking.pricing.totalAmount;
+  }
+
+  booking.status = BOOKING_STATUS.CANCELLED_BY_DRIVER;
+  booking.cancellationDetails = {
+    cancelledBy: 'driver',
+    reason: reason || 'Force cancelled for testing',
+    cancelledAt: new Date()
+  };
+  booking.timeline.cancelledAt = new Date();
+
+  await booking.save();
+  console.log('[ForceCancel] ✅ Booking force cancelled successfully');
+
+  // Populate and notify user
+  await booking.populate('userId', 'phoneNumber profile fcmToken');
+
+  if (booking.userId) {
+    try {
+      await notificationService.sendNotification(
+        booking.userId._id,
+        'Trip Cancelled',
+        `Driver cancelled the ongoing trip. Reason: ${reason || 'Force cancelled for testing'}`,
+        'booking_cancelled',
+        { bookingId: booking._id, cancelledBy: 'driver', reason: reason }
+      );
+    } catch (notifError) {
+      console.error('[ForceCancel] Failed to notify user:', notifError.message);
+    }
+  }
+
+  // Emit socket event
+  try {
+    emitBookingUpdate(booking);
+  } catch (error) {
+    console.error('[ForceCancel] Failed to emit socket event:', error.message);
+  }
+
+  console.log('========== FORCE CANCEL COMPLETED ==========\n');
+
+  res.status(200).json({
+    success: true,
+    message: '⚠️ TESTING: Trip force cancelled successfully',
+    data: { booking }
+  });
+});
+
 // Get driver's booking history
 exports.getDriverBookingHistory = asyncHandler(async (req, res) => {
   const { page = 1, limit = 10, status } = req.query;
