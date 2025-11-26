@@ -163,6 +163,14 @@ router.patch(
   bookingController.cancelBookingByDriver
 );
 
+// ⚠️ TESTING ONLY: Force complete trip (bypasses verification)
+router.patch(
+  '/driver/:bookingId/force-complete',
+  authMiddleware,
+  roleMiddleware('driver'),
+  bookingController.forceComplete
+);
+
 // ⚠️ TESTING ONLY: Force cancel ongoing trip (allows in_progress cancellation)
 router.patch(
   '/driver/:bookingId/force-cancel',

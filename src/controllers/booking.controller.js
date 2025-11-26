@@ -1559,6 +1559,109 @@ exports.cancelBookingByDriver = asyncHandler(async (req, res) => {
   res.status(200).json(responseData);
 });
 
+// ⚠️ TESTING ONLY: Force complete trip (bypasses all verification checks)
+// WARNING: This is for testing purposes only and should NOT be used in production
+exports.forceComplete = asyncHandler(async (req, res) => {
+  const { bookingId } = req.params;
+
+  console.log('\n========== FORCE COMPLETE (TESTING ONLY) ==========');
+  console.log('[ForceComplete] Booking ID:', bookingId);
+
+  const driver = await Driver.findOne({ userId: req.userId });
+  if (!driver) {
+    throw new NotFoundError('Driver profile not found');
+  }
+
+  const booking = await Booking.findOne({
+    _id: bookingId,
+    driverId: driver._id
+  });
+
+  if (!booking) {
+    throw new NotFoundError('Booking not found or not assigned to you');
+  }
+
+  console.log('[ForceComplete] Current booking status:', booking.status);
+
+  // Only block if already completed or cancelled
+  if ([BOOKING_STATUS.COMPLETED, BOOKING_STATUS.CANCELLED_BY_USER, BOOKING_STATUS.CANCELLED_BY_DRIVER].includes(booking.status)) {
+    throw new ValidationError('Booking already completed or cancelled');
+  }
+
+  // ⚠️ TESTING: Skip all checks and complete the trip
+  console.log('[ForceComplete] ⚠️ TESTING MODE: Forcing trip completion');
+
+  // Calculate driver earnings and platform commission
+  const pricing = await PricingConfig.findOne({ vehicleType: booking.vehicleType });
+  const commissionPercentage = pricing?.driverCommissionPercentage || 20;
+
+  booking.platformCommission = (booking.pricing.totalAmount * commissionPercentage) / 100;
+  booking.driverEarnings = booking.pricing.totalAmount - booking.platformCommission;
+
+  booking.status = BOOKING_STATUS.COMPLETED;
+  booking.timeline.completedAt = new Date();
+
+  // Set started time if not set
+  if (!booking.timeline.startedAt) {
+    booking.timeline.startedAt = new Date(Date.now() - 300000); // 5 mins ago
+  }
+
+  await booking.save();
+
+  // Update driver earnings
+  driver.earnings.totalEarnings += booking.driverEarnings;
+  driver.earnings.availableBalance += booking.driverEarnings;
+  await driver.save();
+
+  console.log('[ForceComplete] ✅ Booking force completed successfully');
+  console.log('[ForceComplete] Driver earnings:', booking.driverEarnings);
+  console.log('[ForceComplete] Platform commission:', booking.platformCommission);
+
+  // Populate user and driver details
+  await booking.populate('userId', 'phoneNumber profile fcmToken');
+  await driver.populate('userId', 'phoneNumber profile');
+
+  // Send notification
+  const driverName = driver.userId?.profile?.firstName && driver.userId?.profile?.lastName
+    ? `${driver.userId.profile.firstName} ${driver.userId.profile.lastName}`
+    : driver.userId?.phoneNumber || 'Driver';
+
+  try {
+    await notificationService.sendNotification(
+      booking.userId._id,
+      'Trip Completed',
+      `Your trip with ${driverName} has been completed! Amount: ${booking.pricing.totalAmount} ${booking.pricing.currency}`,
+      'trip_completed',
+      {
+        bookingId: booking._id,
+        bookingNumber: booking.bookingNumber,
+        totalAmount: booking.pricing.totalAmount
+      }
+    );
+  } catch (notifError) {
+    console.error('[ForceComplete] Failed to notify user:', notifError.message);
+  }
+
+  // Emit socket event
+  try {
+    emitBookingUpdate(booking);
+  } catch (error) {
+    console.error('[ForceComplete] Failed to emit socket event:', error.message);
+  }
+
+  console.log('========== FORCE COMPLETE COMPLETED ==========\n');
+
+  res.status(200).json({
+    success: true,
+    message: '⚠️ TESTING: Trip force completed successfully',
+    data: {
+      booking,
+      earnings: booking.driverEarnings,
+      commission: booking.platformCommission
+    }
+  });
+});
+
 // ⚠️ TESTING ONLY: Force cancel ongoing trip (allows cancelling in_progress trips)
 // WARNING: This is for testing purposes only and should NOT be used in production
 exports.forceCancel = asyncHandler(async (req, res) => {
