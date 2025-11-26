@@ -11,6 +11,7 @@ const redisService = require('../services/redis.service');
 const { isRedisAvailable } = require('../config/redis');
 const { emitBookingUpdate } = require('../config/socket');
 const { emitToUser } = require('../services/socket.service');
+const { calculateDistance } = require('../utils/helpers');
 
 /**
  * USER BOOKING APIS
@@ -53,6 +54,9 @@ exports.getNearbyDrivers = asyncHandler(async (req, res) => {
         // Map drivers with distance from Redis
         nearbyDrivers = drivers.map(driver => {
           const redisData = redisResults.find(r => r.driverId === driver._id.toString());
+          // Redis returns distance in meters, convert to km
+          const distanceInKm = redisData ? parseFloat((redisData.distance / 1000).toFixed(2)) : null;
+
           return {
             id: driver._id,
             location: {
@@ -64,10 +68,7 @@ exports.getNearbyDrivers = asyncHandler(async (req, res) => {
             vehicleNumber: driver.vehicleDetails?.vehicleNumber,
             rating: driver.rating?.average || 0,
             totalRatings: driver.rating?.totalRatings || 0,
-            vehicleNumber: driver.vehicleDetails?.vehicleNumber,
-            rating: driver.rating?.average || 0,
-            totalRatings: driver.rating?.totalRatings || 0,
-            distance: redisData ? redisData.distance : null,
+            distanceKm: distanceInKm,
             name: driver.userId?.profile?.firstName
               ? `${driver.userId.profile.firstName} ${driver.userId.profile.lastName || ''}`.trim()
               : 'Driver'
@@ -75,7 +76,7 @@ exports.getNearbyDrivers = asyncHandler(async (req, res) => {
         });
 
         // Sort by distance (closest first)
-        nearbyDrivers.sort((a, b) => a.distance - b.distance);
+        nearbyDrivers.sort((a, b) => (a.distanceKm || 0) - (b.distanceKm || 0));
         source = 'redis';
       }
     } catch (redisError) {
@@ -113,24 +114,32 @@ exports.getNearbyDrivers = asyncHandler(async (req, res) => {
 
       console.log(`[Booking] Found ${drivers.length} nearby drivers in MongoDB`);
 
-      nearbyDrivers = drivers.map(driver => ({
-        id: driver._id,
-        location: {
-          latitude: driver.currentLocation.coordinates[1],
-          longitude: driver.currentLocation.coordinates[0],
-          address: driver.currentLocation.address
-        },
-        vehicleType: driver.vehicleDetails?.vehicleType,
-        vehicleNumber: driver.vehicleDetails?.vehicleNumber,
-        rating: driver.rating?.average || 0,
-        totalRatings: driver.rating?.totalRatings || 0,
-        rating: driver.rating?.average || 0,
-        totalRatings: driver.rating?.totalRatings || 0,
-        distance: null,
-        name: driver.userId?.profile?.firstName
-          ? `${driver.userId.profile.firstName} ${driver.userId.profile.lastName || ''}`.trim()
-          : 'Driver'
-      }));
+      nearbyDrivers = drivers.map(driver => {
+        // Calculate distance using Haversine formula
+        const distanceInKm = calculateDistance(
+          lat,
+          lng,
+          driver.currentLocation.coordinates[1],
+          driver.currentLocation.coordinates[0]
+        );
+
+        return {
+          id: driver._id,
+          location: {
+            latitude: driver.currentLocation.coordinates[1],
+            longitude: driver.currentLocation.coordinates[0],
+            address: driver.currentLocation.address
+          },
+          vehicleType: driver.vehicleDetails?.vehicleType,
+          vehicleNumber: driver.vehicleDetails?.vehicleNumber,
+          rating: driver.rating?.average || 0,
+          totalRatings: driver.rating?.totalRatings || 0,
+          distanceKm: distanceInKm,
+          name: driver.userId?.profile?.firstName
+            ? `${driver.userId.profile.firstName} ${driver.userId.profile.lastName || ''}`.trim()
+            : 'Driver'
+        };
+      });
     } catch (mongoError) {
       console.error('[Booking] MongoDB geospatial query failed:', mongoError);
       // Return empty array instead of crashing
