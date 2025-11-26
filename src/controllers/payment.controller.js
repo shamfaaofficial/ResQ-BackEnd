@@ -74,6 +74,8 @@ exports.updatePaymentStatus = asyncHandler(async (req, res) => {
   if (mappedStatus === PAYMENT_STATUS.COMPLETED) {
     booking.status = BOOKING_STATUS.PAYMENT_COMPLETED;
     booking.timeline.paymentCompletedAt = new Date();
+    // IMPORTANT: Clear payment expiry since payment is now completed
+    booking.paymentExpiresAt = null;
 
     // Create transaction record
     await Transaction.create({
