@@ -71,6 +71,14 @@ router.patch(
   bookingController.cancelBooking
 );
 
+// ⚠️ TESTING ONLY: User force cancel trip (for testing purposes)
+router.patch(
+  '/user/:bookingId/force-cancel',
+  authMiddleware,
+  roleMiddleware('user'),
+  bookingController.userForceCancel
+);
+
 // Get user's booking history (protected - user only)
 router.get(
   '/user/history',
