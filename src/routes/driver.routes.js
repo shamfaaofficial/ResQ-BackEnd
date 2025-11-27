@@ -34,6 +34,15 @@ router.get(
   driverController.getDriverProfile
 );
 
+// Upload/Update profile picture
+router.post(
+  '/profile-picture',
+  authMiddleware,
+  roleMiddleware('driver'),
+  upload.single('profilePicture'), // 'profilePicture' is the form field name
+  driverController.uploadProfilePicture
+);
+
 // Update FCM token (protected - driver only)
 router.post(
   '/fcm-token',

@@ -3,6 +3,24 @@ const router = express.Router();
 const authController = require('../controllers/auth.controller');
 const { authMiddleware } = require('../middlewares/auth');
 const { upload } = require('../middlewares/upload');
+const multer = require('multer');
+
+// Configure multer for memory storage (for S3 uploads)
+const uploadMemory = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Accept images only for profile pictures
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only JPEG and PNG images are allowed for profile pictures.'));
+    }
+  }
+});
 
 // User Authentication Routes
 router.post('/user/signup', authController.userSignup);
@@ -14,7 +32,11 @@ router.post('/user/refresh-token', authController.userRefreshToken);
 // Driver Authentication Routes
 router.post('/driver/signup', authController.driverSignup);
 router.post('/driver/verify-otp', authController.driverVerifyOTP);
-router.post('/driver/complete-signup', authController.driverCompleteSignup);
+router.post(
+  '/driver/complete-signup',
+  uploadMemory.single('profilePicture'), // Optional profile picture
+  authController.driverCompleteSignup
+);
 router.post('/driver/login', authController.driverLogin);
 router.post('/driver/refresh-token', authController.driverRefreshToken);
 

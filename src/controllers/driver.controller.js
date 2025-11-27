@@ -18,9 +18,89 @@ exports.getDriverProfile = asyncHandler(async (req, res) => {
     throw new NotFoundError('Driver profile not found');
   }
 
+  // Generate signed URL for profile picture if it exists
+  let profilePictureSignedUrl = null;
+  if (driver.userId && driver.userId.profile && driver.userId.profile.profileImage) {
+    try {
+      const { extractS3Key, getSignedFileUrl } = require('../config/s3');
+      const s3Key = extractS3Key(driver.userId.profile.profileImage);
+      profilePictureSignedUrl = await getSignedFileUrl(s3Key, 3600); // 1 hour expiry
+    } catch (error) {
+      console.error('Failed to generate signed URL for profile picture:', error);
+    }
+  }
+
+  // Add signed URL to response
+  const driverData = driver.toObject();
+  if (driverData.userId && driverData.userId.profile) {
+    driverData.userId.profile.profileImageSignedUrl = profilePictureSignedUrl;
+  }
+
   res.status(200).json({
     success: true,
-    data: { driver }
+    data: { driver: driverData }
+  });
+});
+
+// Upload or update driver profile picture
+exports.uploadProfilePicture = asyncHandler(async (req, res) => {
+  const { uploadToS3, deleteFromS3, extractS3Key, getSignedFileUrl } = require('../config/s3');
+  const path = require('path');
+
+  // Check if file was uploaded
+  if (!req.file) {
+    throw new ValidationError('No image file uploaded');
+  }
+
+  // Get user
+  const user = await User.findById(req.userId);
+  if (!user) {
+    throw new NotFoundError('User not found');
+  }
+
+  // Get driver profile
+  const driver = await Driver.findOne({ userId: req.userId });
+  if (!driver) {
+    throw new NotFoundError('Driver profile not found');
+  }
+
+  // Delete old profile picture from S3 if exists
+  if (user.profile && user.profile.profileImage) {
+    try {
+      const oldS3Key = extractS3Key(user.profile.profileImage);
+      await deleteFromS3(oldS3Key);
+      console.log('Old profile picture deleted from S3');
+    } catch (error) {
+      console.error('Failed to delete old profile picture:', error);
+      // Continue even if deletion fails
+    }
+  }
+
+  // Generate unique filename for profile picture
+  const fileExtension = path.extname(req.file.originalname);
+  const s3FileName = `drivers/${driver._id}/profile_picture_${Date.now()}${fileExtension}`;
+
+  // Upload to S3
+  const s3Url = await uploadToS3(req.file.buffer, s3FileName, req.file.mimetype);
+
+  // Update user profile with new image URL
+  if (!user.profile) {
+    user.profile = {};
+  }
+  user.profile.profileImage = s3Url;
+  await user.save();
+
+  // Generate signed URL for response
+  const signedUrl = await getSignedFileUrl(s3FileName, 3600);
+
+  res.status(200).json({
+    success: true,
+    message: 'Profile picture uploaded successfully',
+    data: {
+      profileImage: s3Url,
+      profileImageSignedUrl: signedUrl,
+      uploadedAt: new Date()
+    }
   });
 });
 

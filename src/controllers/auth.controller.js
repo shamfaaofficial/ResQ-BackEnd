@@ -365,6 +365,27 @@ exports.driverCompleteSignup = asyncHandler(async (req, res) => {
   // Hash password
   const hashedPassword = await hashPassword(password);
 
+  // Handle optional profile picture upload
+  let profileImageUrl = null;
+  if (req.file) {
+    try {
+      const { uploadToS3 } = require('../config/s3');
+      const path = require('path');
+
+      // Generate temporary driver ID for S3 path (will be replaced with actual driver ID)
+      const tempId = Date.now();
+      const fileExtension = path.extname(req.file.originalname);
+      const s3FileName = `drivers/temp_${tempId}/profile_picture_${tempId}${fileExtension}`;
+
+      // Upload to S3
+      profileImageUrl = await uploadToS3(req.file.buffer, s3FileName, req.file.mimetype);
+      console.log('Profile picture uploaded during signup:', profileImageUrl);
+    } catch (error) {
+      console.error('Failed to upload profile picture during signup:', error);
+      // Don't fail signup if profile picture upload fails
+    }
+  }
+
   // Create user with driver role
   const user = await User.create({
     phoneNumber,
@@ -374,7 +395,8 @@ exports.driverCompleteSignup = asyncHandler(async (req, res) => {
     isActive: true,
     profile: {
       firstName,
-      lastName: lastName || ''
+      lastName: lastName || '',
+      profileImage: profileImageUrl
     }
   });
 
@@ -383,6 +405,34 @@ exports.driverCompleteSignup = asyncHandler(async (req, res) => {
     userId: user._id,
     approvalStatus: 'pending'
   });
+
+  // If profile picture was uploaded with temp ID, move it to proper location
+  if (profileImageUrl && req.file) {
+    try {
+      const { uploadToS3, deleteFromS3, extractS3Key } = require('../config/s3');
+      const path = require('path');
+
+      const fileExtension = path.extname(req.file.originalname);
+      const properS3FileName = `drivers/${driver._id}/profile_picture_${Date.now()}${fileExtension}`;
+
+      // Upload to proper location
+      const properS3Url = await uploadToS3(req.file.buffer, properS3FileName, req.file.mimetype);
+
+      // Delete temp file
+      const tempS3Key = extractS3Key(profileImageUrl);
+      await deleteFromS3(tempS3Key);
+
+      // Update user with proper URL
+      user.profile.profileImage = properS3Url;
+      await user.save();
+
+      profileImageUrl = properS3Url;
+      console.log('Profile picture moved to proper location:', properS3Url);
+    } catch (error) {
+      console.error('Failed to move profile picture to proper location:', error);
+      // Continue with temp URL if move fails
+    }
+  }
 
   // Generate tokens
   const accessToken = generateAccessToken(user._id, user.role);
@@ -401,7 +451,8 @@ exports.driverCompleteSignup = asyncHandler(async (req, res) => {
         phoneNumber: user.phoneNumber,
         role: user.role,
         firstName: user.profile.firstName,
-        lastName: user.profile.lastName
+        lastName: user.profile.lastName,
+        profileImage: profileImageUrl
       },
       driver: {
         id: driver._id,
