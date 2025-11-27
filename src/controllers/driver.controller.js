@@ -396,4 +396,146 @@ exports.getActiveTrip = asyncHandler(async (req, res) => {
   });
 });
 
+// Get driver ride history
+exports.getRideHistory = asyncHandler(async (req, res) => {
+  const driver = await Driver.findOne({ userId: req.userId });
+  if (!driver) {
+    throw new NotFoundError('Driver profile not found');
+  }
+
+  const { BOOKING_STATUS, PAGINATION } = require('../config/constants');
+
+  // Query parameters
+  const {
+    page = PAGINATION.DEFAULT_PAGE,
+    limit = PAGINATION.DEFAULT_LIMIT,
+    status,
+    startDate,
+    endDate,
+    sortBy = 'createdAt',
+    sortOrder = 'desc'
+  } = req.query;
+
+  // Validate pagination
+  const pageNum = Math.max(1, parseInt(page));
+  const limitNum = Math.min(parseInt(limit) || PAGINATION.DEFAULT_LIMIT, PAGINATION.MAX_LIMIT);
+  const skip = (pageNum - 1) * limitNum;
+
+  // Build query
+  const query = { driverId: driver._id };
+
+  // Filter by status (completed, cancelled_by_user, cancelled_by_driver)
+  if (status) {
+    // Allow filtering by specific status or multiple statuses
+    if (Array.isArray(status)) {
+      query.status = { $in: status };
+    } else if (status === 'completed') {
+      query.status = BOOKING_STATUS.COMPLETED;
+    } else if (status === 'cancelled') {
+      query.status = {
+        $in: [BOOKING_STATUS.CANCELLED_BY_USER, BOOKING_STATUS.CANCELLED_BY_DRIVER]
+      };
+    } else {
+      query.status = status;
+    }
+  } else {
+    // Default: Show only completed and cancelled trips (not active trips)
+    query.status = {
+      $in: [
+        BOOKING_STATUS.COMPLETED,
+        BOOKING_STATUS.CANCELLED_BY_USER,
+        BOOKING_STATUS.CANCELLED_BY_DRIVER
+      ]
+    };
+  }
+
+  // Filter by date range
+  if (startDate || endDate) {
+    query.createdAt = {};
+    if (startDate) {
+      query.createdAt.$gte = new Date(startDate);
+    }
+    if (endDate) {
+      // Include the entire end date (set to end of day)
+      const endDateTime = new Date(endDate);
+      endDateTime.setHours(23, 59, 59, 999);
+      query.createdAt.$lte = endDateTime;
+    }
+  }
+
+  // Sort configuration
+  const sortConfig = {};
+  const validSortFields = ['createdAt', 'completedAt', 'totalAmount', 'driverEarnings'];
+  const sortField = validSortFields.includes(sortBy) ? sortBy : 'createdAt';
+
+  // Map sortBy to actual field paths
+  const sortFieldMap = {
+    'createdAt': 'createdAt',
+    'completedAt': 'timeline.completedAt',
+    'totalAmount': 'pricing.totalAmount',
+    'driverEarnings': 'driverEarnings'
+  };
+
+  sortConfig[sortFieldMap[sortField]] = sortOrder === 'asc' ? 1 : -1;
+
+  // Execute queries in parallel
+  const [bookings, totalCount] = await Promise.all([
+    Booking.find(query)
+      .populate('userId', 'phoneNumber profile')
+      .select('-__v -verificationCode')
+      .sort(sortConfig)
+      .skip(skip)
+      .limit(limitNum)
+      .lean(),
+    Booking.countDocuments(query)
+  ]);
+
+  // Calculate statistics
+  const stats = await Booking.aggregate([
+    { $match: { driverId: driver._id } },
+    {
+      $group: {
+        _id: '$status',
+        count: { $sum: 1 },
+        totalEarnings: {
+          $sum: {
+            $cond: [
+              { $eq: ['$status', BOOKING_STATUS.COMPLETED] },
+              '$driverEarnings',
+              0
+            ]
+          }
+        }
+      }
+    }
+  ]);
+
+  // Format stats
+  const statistics = {
+    totalCompleted: stats.find(s => s._id === BOOKING_STATUS.COMPLETED)?.count || 0,
+    totalCancelled: (
+      (stats.find(s => s._id === BOOKING_STATUS.CANCELLED_BY_USER)?.count || 0) +
+      (stats.find(s => s._id === BOOKING_STATUS.CANCELLED_BY_DRIVER)?.count || 0)
+    ),
+    totalEarnings: stats.find(s => s._id === BOOKING_STATUS.COMPLETED)?.totalEarnings || 0,
+    totalTrips: stats.reduce((sum, s) => sum + s.count, 0)
+  };
+
+  res.status(200).json({
+    success: true,
+    data: {
+      rides: bookings,
+      pagination: {
+        currentPage: pageNum,
+        totalPages: Math.ceil(totalCount / limitNum),
+        totalRecords: totalCount,
+        recordsPerPage: limitNum,
+        hasNextPage: pageNum < Math.ceil(totalCount / limitNum),
+        hasPreviousPage: pageNum > 1
+      },
+      statistics
+    }
+  });
+});
+
 module.exports = exports;

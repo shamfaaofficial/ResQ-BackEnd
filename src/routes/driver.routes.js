@@ -99,6 +99,14 @@ router.get(
   driverController.getActiveTrip
 );
 
+// Get ride history
+router.get(
+  '/bookings/history',
+  authMiddleware,
+  roleMiddleware('driver'),
+  driverController.getRideHistory
+);
+
 /**
  * DOCUMENT UPLOAD ROUTES
  */
