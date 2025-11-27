@@ -15,11 +15,12 @@ const upload = multer({
   },
   fileFilter: (req, file, cb) => {
     // Accept images and PDFs only
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf', 'image/webp'];
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Invalid file type. Only JPEG, PNG, and PDF files are allowed.'));
+      console.log(`[Multer] Rejected file type: ${file.mimetype} for file: ${file.originalname}`);
+      cb(new Error(`Invalid file type: ${file.mimetype}. Only JPEG, PNG, and PDF files are allowed.`));
     }
   }
 });
