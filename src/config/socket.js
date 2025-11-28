@@ -2,6 +2,7 @@ const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
 const Driver = require('../models/Driver');
 const Booking = require('../models/Booking');
+const chatService = require('../services/chat.service');
 
 let io;
 
@@ -406,6 +407,224 @@ const initializeSocket = (server) => {
       socket.leave(`booking:${bookingId}`);
       console.log(`✅ [Socket Room] Left booking:${bookingId}`);
     });
+
+    // =====================================================================
+    // CHAT EVENT HANDLERS
+    // =====================================================================
+
+    // Join a chat room
+    socket.on('chat:join', async (data, callback) => {
+      console.log(`\n💬 [Socket Event] chat:join received`);
+      console.log(`   From: ${socket.userRole} ${socket.userId}`);
+      console.log(`   Data:`, JSON.stringify(data, null, 2));
+
+      try {
+        const { chatId } = data;
+
+        // Verify user has access to this chat
+        const chat = await chatService.getChatById(chatId, socket.userId, socket.userRole);
+
+        // Join the chat room
+        socket.join(`chat:${chatId}`);
+
+        console.log(`✅ [Socket Room] User joined chat successfully`);
+        console.log(`   Room: chat:${chatId}`);
+        console.log(`   User: ${socket.userId} (${socket.userRole})`);
+
+        // Notify other participant
+        socket.to(`chat:${chatId}`).emit('chat:user_joined', {
+          chatId,
+          userId: socket.userId,
+          userRole: socket.userRole,
+        });
+
+        // Send success callback
+        if (callback) {
+          callback({
+            success: true,
+            chat,
+          });
+        }
+      } catch (error) {
+        console.error(`❌ [Socket] Chat join error:`, error.message);
+        if (callback) {
+          callback({
+            success: false,
+            error: error.message,
+          });
+        }
+      }
+    });
+
+    // Leave a chat room
+    socket.on('chat:leave', async (data) => {
+      console.log(`\n💬 [Socket Event] chat:leave received`);
+      console.log(`   From: ${socket.userRole} ${socket.userId}`);
+      console.log(`   Data:`, JSON.stringify(data, null, 2));
+
+      try {
+        const { chatId } = data;
+
+        socket.leave(`chat:${chatId}`);
+        console.log(`✅ [Socket Room] Left chat:${chatId}`);
+
+        // Notify other participant
+        socket.to(`chat:${chatId}`).emit('chat:user_left', {
+          chatId,
+          userId: socket.userId,
+        });
+      } catch (error) {
+        console.error(`❌ [Socket] Chat leave error:`, error.message);
+      }
+    });
+
+    // Send message
+    socket.on('chat:send_message', async (data, callback) => {
+      console.log(`\n💬 [Socket Event] chat:send_message received`);
+      console.log(`   From: ${socket.userRole} ${socket.userId}`);
+      console.log(`   Data:`, JSON.stringify(data, null, 2));
+
+      try {
+        const { chatId, messageType, content, imageUrl, location } = data;
+
+        // Save message to database
+        const message = await chatService.sendMessage(chatId, socket.userId, socket.userRole, {
+          messageType: messageType || 'text',
+          content,
+          imageUrl,
+          location,
+        });
+
+        // Emit message to chat room
+        io.to(`chat:${chatId}`).emit('chat:new_message', {
+          message,
+        });
+
+        // Get recipient ID and send notification
+        const chat = await chatService.getChatById(chatId, socket.userId, socket.userRole);
+        const recipientId = socket.userRole === 'user' ? chat.driverId._id : chat.userId._id;
+        const recipientRole = socket.userRole === 'user' ? 'driver' : 'user';
+
+        // Emit to recipient's personal room for notification badge update
+        io.to(`${recipientRole}:${recipientId}`).emit('chat:new_message_notification', {
+          chatId,
+          message,
+          unreadCount: socket.userRole === 'user' ? chat.unreadCountDriver : chat.unreadCountUser,
+        });
+
+        console.log(`✅ [Socket] Message sent successfully`);
+        console.log(`   Chat ID: ${chatId}`);
+        console.log(`   Message ID: ${message._id}`);
+        console.log(`   Type: ${message.messageType}`);
+
+        // Send success callback
+        if (callback) {
+          callback({
+            success: true,
+            message,
+          });
+        }
+      } catch (error) {
+        console.error(`❌ [Socket] Send message error:`, error.message);
+        if (callback) {
+          callback({
+            success: false,
+            error: error.message,
+          });
+        }
+      }
+    });
+
+    // User is typing
+    socket.on('chat:typing', async (data) => {
+      console.log(`\n✍️  [Socket Event] chat:typing received`);
+      console.log(`   From: ${socket.userRole} ${socket.userId}`);
+      console.log(`   Data:`, JSON.stringify(data, null, 2));
+
+      try {
+        const { chatId } = data;
+
+        // Broadcast to other users in the chat room
+        socket.to(`chat:${chatId}`).emit('chat:user_typing', {
+          chatId,
+          userId: socket.userId,
+          userRole: socket.userRole,
+        });
+      } catch (error) {
+        console.error(`❌ [Socket] Typing event error:`, error.message);
+      }
+    });
+
+    // User stopped typing
+    socket.on('chat:stop_typing', async (data) => {
+      console.log(`\n✋ [Socket Event] chat:stop_typing received`);
+      console.log(`   From: ${socket.userRole} ${socket.userId}`);
+      console.log(`   Data:`, JSON.stringify(data, null, 2));
+
+      try {
+        const { chatId } = data;
+
+        // Broadcast to other users in the chat room
+        socket.to(`chat:${chatId}`).emit('chat:user_stop_typing', {
+          chatId,
+          userId: socket.userId,
+          userRole: socket.userRole,
+        });
+      } catch (error) {
+        console.error(`❌ [Socket] Stop typing event error:`, error.message);
+      }
+    });
+
+    // Message delivered
+    socket.on('chat:message_delivered', async (data) => {
+      console.log(`\n✓ [Socket Event] chat:message_delivered received`);
+      console.log(`   From: ${socket.userRole} ${socket.userId}`);
+      console.log(`   Data:`, JSON.stringify(data, null, 2));
+
+      try {
+        const { messageId, chatId } = data;
+
+        // Update message delivery status
+        await chatService.markMessageAsDelivered(messageId);
+
+        // Notify sender
+        socket.to(`chat:${chatId}`).emit('chat:message_delivered_update', {
+          messageId,
+          deliveredAt: new Date(),
+        });
+      } catch (error) {
+        console.error(`❌ [Socket] Message delivered error:`, error.message);
+      }
+    });
+
+    // Messages read
+    socket.on('chat:messages_read', async (data) => {
+      console.log(`\n✓✓ [Socket Event] chat:messages_read received`);
+      console.log(`   From: ${socket.userRole} ${socket.userId}`);
+      console.log(`   Data:`, JSON.stringify(data, null, 2));
+
+      try {
+        const { chatId } = data;
+
+        // Mark messages as read
+        await chatService.markMessagesAsRead(chatId, socket.userId, socket.userRole);
+
+        // Notify sender
+        socket.to(`chat:${chatId}`).emit('chat:messages_read_update', {
+          chatId,
+          readBy: socket.userId,
+          readAt: new Date(),
+        });
+
+        console.log(`✅ [Socket] Messages marked as read in chat ${chatId}`);
+      } catch (error) {
+        console.error(`❌ [Socket] Messages read error:`, error.message);
+      }
+    });
+
+    // =====================================================================
+    // END CHAT EVENT HANDLERS
+    // =====================================================================
 
     // Disconnect handler
     socket.on('disconnect', (reason) => {
