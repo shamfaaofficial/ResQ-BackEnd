@@ -20,12 +20,14 @@ class NotificationService {
 
       // Send push notification via Firebase
       if (userId) {
+        console.log(`[NotificationService] Sending push to USER ${userId}: ${title}`);
         await firebaseService.sendPushToUser(userId, title, message, {
           ...data,
           notificationId: notification._id.toString(),
           type
         }, dataOnly);
       } else if (driverId) {
+        console.log(`[NotificationService] Sending push to DRIVER ${driverId}: ${title}`);
         await firebaseService.sendPushToDriver(driverId, title, message, {
           ...data,
           notificationId: notification._id.toString(),
@@ -110,6 +112,8 @@ class NotificationService {
    * Notify user about booking acceptance
    */
   async notifyBookingAccepted(userId, bookingId, driverName, verificationCode) {
+    console.log(`[NotificationService] Preparing to notify user ${userId} about booking acceptance. Verification Code: ${verificationCode}`);
+
     const message = verificationCode
       ? `${driverName} accepted your booking! Your verification code: ${verificationCode}`
       : `Driver ${driverName} has accepted your request. Payment required within 5 minutes.`;
