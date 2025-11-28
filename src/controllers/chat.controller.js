@@ -1,6 +1,19 @@
 const asyncHandler = require('express-async-handler');
 const chatService = require('../services/chat.service');
 const { ValidationError } = require('../utils/errors');
+const Driver = require('../models/Driver');
+const Booking = require('../models/Booking');
+
+/**
+ * Helper to get driver ID from user ID
+ */
+const getDriverId = async (userId) => {
+  const driver = await Driver.findOne({ userId });
+  if (!driver) {
+    throw new ValidationError('Driver profile not found');
+  }
+  return driver._id;
+};
 
 /**
  * @route   POST /api/v1/chat
@@ -9,8 +22,8 @@ const { ValidationError } = require('../utils/errors');
  */
 exports.createOrGetChat = asyncHandler(async (req, res) => {
   const { bookingId } = req.body;
-  const requesterId = req.userId;  // Set by auth middleware
-  const role = req.userRole;        // Set by auth middleware
+  const requesterId = req.userId;  // User ID from auth middleware
+  const role = req.userRole;       // Role from auth middleware
 
   // Validate required fields
   if (!bookingId) {
@@ -26,7 +39,6 @@ exports.createOrGetChat = asyncHandler(async (req, res) => {
   }
 
   // First, fetch the booking to get userId and driverId
-  const Booking = require('../models/Booking');
   const booking = await Booking.findById(bookingId);
 
   if (!booking) {
@@ -42,9 +54,15 @@ exports.createOrGetChat = asyncHandler(async (req, res) => {
     throw new ValidationError('Booking does not have a driver assigned yet. Please wait for a driver to accept the booking.');
   }
 
+  // Resolve actual participant ID based on role
+  let participantId = requesterId;
+  if (role === 'driver') {
+    participantId = await getDriverId(requesterId);
+  }
+
   // Verify the requester is part of this booking
-  const isUser = role === 'user' && booking.userId && booking.userId.toString() === requesterId.toString();
-  const isDriver = role === 'driver' && booking.driverId && booking.driverId.toString() === requesterId.toString();
+  const isUser = role === 'user' && booking.userId.toString() === participantId.toString();
+  const isDriver = role === 'driver' && booking.driverId.toString() === participantId.toString();
 
   if (!isUser && !isDriver) {
     throw new ValidationError('You are not authorized to access this chat');
@@ -69,7 +87,12 @@ exports.getChatById = asyncHandler(async (req, res) => {
   const userId = req.userId;
   const role = req.userRole;
 
-  const chat = await chatService.getChatById(chatId, userId, role);
+  let participantId = userId;
+  if (role === 'driver') {
+    participantId = await getDriverId(userId);
+  }
+
+  const chat = await chatService.getChatById(chatId, participantId, role);
 
   res.status(200).json({
     success: true,
@@ -87,7 +110,12 @@ exports.getChatByBookingId = asyncHandler(async (req, res) => {
   const userId = req.userId;
   const role = req.userRole;
 
-  const chat = await chatService.getChatByBookingId(bookingId, userId, role);
+  let participantId = userId;
+  if (role === 'driver') {
+    participantId = await getDriverId(userId);
+  }
+
+  const chat = await chatService.getChatByBookingId(bookingId, participantId, role);
 
   res.status(200).json({
     success: true,
@@ -110,7 +138,8 @@ exports.getChats = asyncHandler(async (req, res) => {
   if (role === 'user') {
     result = await chatService.getUserChats(userId, page, limit);
   } else if (role === 'driver') {
-    result = await chatService.getDriverChats(userId, page, limit);
+    const driverId = await getDriverId(userId);
+    result = await chatService.getDriverChats(driverId, page, limit);
   }
 
   res.status(200).json({
@@ -131,7 +160,12 @@ exports.getChatMessages = asyncHandler(async (req, res) => {
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 50;
 
-  const result = await chatService.getChatMessages(chatId, userId, role, page, limit);
+  let participantId = userId;
+  if (role === 'driver') {
+    participantId = await getDriverId(userId);
+  }
+
+  const result = await chatService.getChatMessages(chatId, participantId, role, page, limit);
 
   res.status(200).json({
     success: true,
@@ -150,7 +184,12 @@ exports.sendMessage = asyncHandler(async (req, res) => {
   const role = req.userRole;
   const { messageType, content, imageUrl, location } = req.body;
 
-  const message = await chatService.sendMessage(chatId, userId, role, {
+  let participantId = userId;
+  if (role === 'driver') {
+    participantId = await getDriverId(userId);
+  }
+
+  const message = await chatService.sendMessage(chatId, participantId, role, {
     messageType: messageType || 'text',
     content,
     imageUrl,
@@ -173,7 +212,12 @@ exports.markMessagesAsRead = asyncHandler(async (req, res) => {
   const userId = req.userId;
   const role = req.userRole;
 
-  const result = await chatService.markMessagesAsRead(chatId, userId, role);
+  let participantId = userId;
+  if (role === 'driver') {
+    participantId = await getDriverId(userId);
+  }
+
+  const result = await chatService.markMessagesAsRead(chatId, participantId, role);
 
   res.status(200).json({
     success: true,
@@ -190,7 +234,12 @@ exports.getUnreadCount = asyncHandler(async (req, res) => {
   const userId = req.userId;
   const role = req.userRole;
 
-  const unreadCount = await chatService.getUnreadCount(userId, role);
+  let participantId = userId;
+  if (role === 'driver') {
+    participantId = await getDriverId(userId);
+  }
+
+  const unreadCount = await chatService.getUnreadCount(participantId, role);
 
   res.status(200).json({
     success: true,
@@ -208,7 +257,12 @@ exports.deleteChat = asyncHandler(async (req, res) => {
   const userId = req.userId;
   const role = req.userRole;
 
-  const result = await chatService.deleteChat(chatId, userId, role);
+  let participantId = userId;
+  if (role === 'driver') {
+    participantId = await getDriverId(userId);
+  }
+
+  const result = await chatService.deleteChat(chatId, participantId, role);
 
   res.status(200).json({
     success: true,
