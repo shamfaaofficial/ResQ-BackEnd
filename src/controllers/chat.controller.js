@@ -9,17 +9,34 @@ const { ValidationError } = require('../utils/errors');
  */
 exports.createOrGetChat = asyncHandler(async (req, res) => {
   const { bookingId } = req.body;
-  const { userId, role } = req.user;
+  const { userId: requesterId, role } = req.user;
 
   if (!bookingId) {
     throw new ValidationError('Booking ID is required');
   }
 
-  // For drivers, the userId in JWT is their driver ID
-  const driverId = role === 'driver' ? userId : req.body.driverId;
-  const actualUserId = role === 'user' ? userId : req.body.userId;
+  // First, fetch the booking to get userId and driverId
+  const Booking = require('../models/Booking');
+  const booking = await Booking.findById(bookingId);
 
-  const chat = await chatService.createOrGetChat(bookingId, actualUserId, driverId);
+  if (!booking) {
+    throw new ValidationError('Booking not found');
+  }
+
+  if (!booking.driverId) {
+    throw new ValidationError('Booking does not have a driver assigned yet. Please wait for a driver to accept the booking.');
+  }
+
+  // Verify the requester is part of this booking
+  const isUser = role === 'user' && booking.userId.toString() === requesterId.toString();
+  const isDriver = role === 'driver' && booking.driverId.toString() === requesterId.toString();
+
+  if (!isUser && !isDriver) {
+    throw new ValidationError('You are not authorized to access this chat');
+  }
+
+  // Use the IDs from the booking
+  const chat = await chatService.createOrGetChat(bookingId, booking.userId, booking.driverId);
 
   res.status(200).json({
     success: true,

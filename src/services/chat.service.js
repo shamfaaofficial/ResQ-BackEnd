@@ -15,8 +15,18 @@ class ChatService {
       throw new NotFoundError('Booking not found');
     }
 
+    // Check if booking has required participants
+    if (!booking.userId) {
+      throw new ValidationError('Booking does not have a user assigned');
+    }
+
+    if (!booking.driverId) {
+      throw new ValidationError('Booking does not have a driver assigned yet. Please wait for a driver to accept the booking.');
+    }
+
+    // Verify the participants match
     if (booking.userId.toString() !== userId.toString() ||
-        booking.driverId.toString() !== driverId.toString()) {
+      booking.driverId.toString() !== driverId.toString()) {
       throw new AuthorizationError('You are not authorized to access this chat');
     }
 
