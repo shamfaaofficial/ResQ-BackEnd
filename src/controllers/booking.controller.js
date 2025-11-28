@@ -1118,9 +1118,26 @@ exports.acceptBooking = asyncHandler(async (req, res) => {
   await booking.populate('userId', 'phoneNumber profile fcmToken');
 
   // Send notification to user about booking acceptance
-  const driverName = driver.userId?.profile?.firstName && driver.userId?.profile?.lastName
-    ? `${driver.userId.profile.firstName} ${driver.userId.profile.lastName}`
-    : driver.userId?.phoneNumber || 'Driver';
+  // Log driver profile data for debugging
+  console.log('[AcceptBooking] Driver profile data:', {
+    firstName: driver.userId?.profile?.firstName,
+    lastName: driver.userId?.profile?.lastName,
+    phoneNumber: driver.userId?.phoneNumber
+  });
+
+  // Build driver name with priority: Full Name > "Driver FirstName" > "Driver"
+  let driverName = 'Driver';
+  if (driver.userId?.profile?.firstName) {
+    if (driver.userId.profile.lastName) {
+      // Full name available
+      driverName = `Driver ${driver.userId.profile.firstName} ${driver.userId.profile.lastName}`;
+    } else {
+      // Only first name available
+      driverName = `Driver ${driver.userId.profile.firstName}`;
+    }
+  }
+
+  console.log('[AcceptBooking] Using driver name for notification:', driverName);
 
   try {
     await notificationService.notifyBookingAccepted(
