@@ -108,6 +108,21 @@ const initializeSocket = (server) => {
       socket.userId = decoded.userId;
       socket.userRole = decoded.role;
 
+      // If user is a driver, fetch their driver profile to get the real Driver ID
+      if (socket.userRole === 'driver') {
+        try {
+          const driver = await Driver.findOne({ userId: socket.userId });
+          if (driver) {
+            socket.driverId = driver._id;
+            console.log(`   Driver Profile Found: ${driver._id}`);
+          } else {
+            console.log(`   ⚠️ Driver profile not found for user ${socket.userId}`);
+          }
+        } catch (err) {
+          console.error(`   ❌ Error fetching driver profile: ${err.message}`);
+        }
+      }
+
       console.log(`\n✅✅✅ AUTH SUCCESS ✅✅✅`);
       console.log(`   User ID: ${decoded.userId}`);
       console.log(`   Role: ${decoded.role}`);
@@ -183,23 +198,23 @@ const initializeSocket = (server) => {
     });
 
     // Driver joins their personal room (automatic on connection)
-    if (socket.userRole === 'driver') {
-      socket.join(`driver:${socket.userId}`);
+    if (socket.userRole === 'driver' && socket.driverId) {
+      socket.join(`driver:${socket.driverId}`);
 
       console.log(`\n╔════════════════════════════════════════════════════════════════╗`);
       console.log(`║  🚗 DRIVER AUTO-JOINED ROOM                                   ║`);
       console.log(`╚════════════════════════════════════════════════════════════════╝`);
-      console.log(`   Driver ID: ${socket.userId}`);
-      console.log(`   Room Name: driver:${socket.userId}`);
+      console.log(`   Driver ID: ${socket.driverId}`);
+      console.log(`   Room Name: driver:${socket.driverId}`);
       console.log(`   Socket ID: ${socket.id}`);
       console.log(`   Timestamp: ${new Date().toISOString()}`);
 
       // Send confirmation back to driver
       const confirmationPayload = {
         success: true,
-        room: `driver:${socket.userId}`,
+        room: `driver:${socket.driverId}`,
         socketId: socket.id,
-        userId: socket.userId,
+        userId: socket.driverId,
         timestamp: new Date().toISOString()
       };
 
@@ -264,10 +279,10 @@ const initializeSocket = (server) => {
         return;
       }
 
-      if (driverId !== socket.userId.toString()) {
+      if (!socket.driverId || driverId !== socket.driverId.toString()) {
         console.log(`\n❌❌❌ MANUAL JOIN FAILED - ID MISMATCH ❌❌❌`);
         console.log(`   Requested Driver ID: ${driverId}`);
-        console.log(`   Authenticated User ID: ${socket.userId}`);
+        console.log(`   Authenticated Driver ID: ${socket.driverId}`);
         console.log(`   Security violation: Driver trying to join another driver's room`);
         console.log(`════════════════════════════════════════════════════════════════\n`);
 
@@ -327,8 +342,8 @@ const initializeSocket = (server) => {
           return;
         }
 
-        if (booking.driverId.toString() !== socket.userId.toString()) {
-          console.log(`❌ [Socket] Location update failed - Unauthorized (Driver ${socket.userId} not assigned to booking)`);
+        if (!socket.driverId || booking.driverId.toString() !== socket.driverId.toString()) {
+          console.log(`❌ [Socket] Location update failed - Unauthorized (Driver ${socket.driverId} not assigned to booking)`);
           socket.emit('error', { message: 'Unauthorized' });
           return;
         }
@@ -376,7 +391,7 @@ const initializeSocket = (server) => {
         }
 
         // Verify user is part of booking
-        const isDriver = booking.driverId && booking.driverId.toString() === socket.userId.toString();
+        const isDriver = booking.driverId && socket.driverId && booking.driverId.toString() === socket.driverId.toString();
         const isUser = booking.userId.toString() === socket.userId.toString();
 
         if (!isDriver && !isUser) {
@@ -421,8 +436,13 @@ const initializeSocket = (server) => {
       try {
         const { chatId } = data;
 
+        // Determine participant ID
+        const participantId = socket.userRole === 'driver' && socket.driverId
+          ? socket.driverId
+          : socket.userId;
+
         // Verify user has access to this chat
-        const chat = await chatService.getChatById(chatId, socket.userId, socket.userRole);
+        const chat = await chatService.getChatById(chatId, participantId, socket.userRole);
 
         // Join the chat room
         socket.join(`chat:${chatId}`);
@@ -487,8 +507,13 @@ const initializeSocket = (server) => {
       try {
         const { chatId, messageType, content, imageUrl, location } = data;
 
+        // Determine participant ID
+        const participantId = socket.userRole === 'driver' && socket.driverId
+          ? socket.driverId
+          : socket.userId;
+
         // Save message to database
-        const message = await chatService.sendMessage(chatId, socket.userId, socket.userRole, {
+        const message = await chatService.sendMessage(chatId, participantId, socket.userRole, {
           messageType: messageType || 'text',
           content,
           imageUrl,
@@ -606,8 +631,13 @@ const initializeSocket = (server) => {
       try {
         const { chatId } = data;
 
+        // Determine participant ID
+        const participantId = socket.userRole === 'driver' && socket.driverId
+          ? socket.driverId
+          : socket.userId;
+
         // Mark messages as read
-        await chatService.markMessagesAsRead(chatId, socket.userId, socket.userRole);
+        await chatService.markMessagesAsRead(chatId, participantId, socket.userRole);
 
         // Notify sender
         socket.to(`chat:${chatId}`).emit('chat:messages_read_update', {
