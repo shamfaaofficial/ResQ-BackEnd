@@ -7,19 +7,16 @@ const chatSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Booking',
       required: true,
-      index: true,
     },
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
-      index: true,
     },
     driverId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Driver',
       required: true,
-      index: true,
     },
     lastMessage: {
       type: String,
