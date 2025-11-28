@@ -9,10 +9,20 @@ const { ValidationError } = require('../utils/errors');
  */
 exports.createOrGetChat = asyncHandler(async (req, res) => {
   const { bookingId } = req.body;
-  const { userId: requesterId, role } = req.user;
+  const requesterId = req.userId;  // Set by auth middleware
+  const role = req.userRole;        // Set by auth middleware
 
+  // Validate required fields
   if (!bookingId) {
     throw new ValidationError('Booking ID is required');
+  }
+
+  if (!requesterId) {
+    throw new ValidationError('User authentication failed. Please login again.');
+  }
+
+  if (!role) {
+    throw new ValidationError('User role not found. Please login again.');
   }
 
   // First, fetch the booking to get userId and driverId
@@ -23,13 +33,18 @@ exports.createOrGetChat = asyncHandler(async (req, res) => {
     throw new ValidationError('Booking not found');
   }
 
+  // Validate booking has required fields
+  if (!booking.userId) {
+    throw new ValidationError('Booking does not have a user assigned');
+  }
+
   if (!booking.driverId) {
     throw new ValidationError('Booking does not have a driver assigned yet. Please wait for a driver to accept the booking.');
   }
 
   // Verify the requester is part of this booking
-  const isUser = role === 'user' && booking.userId.toString() === requesterId.toString();
-  const isDriver = role === 'driver' && booking.driverId.toString() === requesterId.toString();
+  const isUser = role === 'user' && booking.userId && booking.userId.toString() === requesterId.toString();
+  const isDriver = role === 'driver' && booking.driverId && booking.driverId.toString() === requesterId.toString();
 
   if (!isUser && !isDriver) {
     throw new ValidationError('You are not authorized to access this chat');
@@ -51,7 +66,8 @@ exports.createOrGetChat = asyncHandler(async (req, res) => {
  */
 exports.getChatById = asyncHandler(async (req, res) => {
   const { chatId } = req.params;
-  const { userId, role } = req.user;
+  const userId = req.userId;
+  const role = req.userRole;
 
   const chat = await chatService.getChatById(chatId, userId, role);
 
@@ -68,7 +84,8 @@ exports.getChatById = asyncHandler(async (req, res) => {
  */
 exports.getChatByBookingId = asyncHandler(async (req, res) => {
   const { bookingId } = req.params;
-  const { userId, role } = req.user;
+  const userId = req.userId;
+  const role = req.userRole;
 
   const chat = await chatService.getChatByBookingId(bookingId, userId, role);
 
@@ -84,7 +101,8 @@ exports.getChatByBookingId = asyncHandler(async (req, res) => {
  * @access  Private (User or Driver)
  */
 exports.getChats = asyncHandler(async (req, res) => {
-  const { userId, role } = req.user;
+  const userId = req.userId;
+  const role = req.userRole;
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 20;
 
@@ -108,7 +126,8 @@ exports.getChats = asyncHandler(async (req, res) => {
  */
 exports.getChatMessages = asyncHandler(async (req, res) => {
   const { chatId } = req.params;
-  const { userId, role } = req.user;
+  const userId = req.userId;
+  const role = req.userRole;
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 50;
 
@@ -127,7 +146,8 @@ exports.getChatMessages = asyncHandler(async (req, res) => {
  */
 exports.sendMessage = asyncHandler(async (req, res) => {
   const { chatId } = req.params;
-  const { userId, role } = req.user;
+  const userId = req.userId;
+  const role = req.userRole;
   const { messageType, content, imageUrl, location } = req.body;
 
   const message = await chatService.sendMessage(chatId, userId, role, {
@@ -150,7 +170,8 @@ exports.sendMessage = asyncHandler(async (req, res) => {
  */
 exports.markMessagesAsRead = asyncHandler(async (req, res) => {
   const { chatId } = req.params;
-  const { userId, role } = req.user;
+  const userId = req.userId;
+  const role = req.userRole;
 
   const result = await chatService.markMessagesAsRead(chatId, userId, role);
 
@@ -166,7 +187,8 @@ exports.markMessagesAsRead = asyncHandler(async (req, res) => {
  * @access  Private (User or Driver)
  */
 exports.getUnreadCount = asyncHandler(async (req, res) => {
-  const { userId, role } = req.user;
+  const userId = req.userId;
+  const role = req.userRole;
 
   const unreadCount = await chatService.getUnreadCount(userId, role);
 
@@ -183,7 +205,8 @@ exports.getUnreadCount = asyncHandler(async (req, res) => {
  */
 exports.deleteChat = asyncHandler(async (req, res) => {
   const { chatId } = req.params;
-  const { userId, role } = req.user;
+  const userId = req.userId;
+  const role = req.userRole;
 
   const result = await chatService.deleteChat(chatId, userId, role);
 
