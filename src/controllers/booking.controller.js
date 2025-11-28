@@ -1123,16 +1123,11 @@ exports.acceptBooking = asyncHandler(async (req, res) => {
     : driver.userId?.phoneNumber || 'Driver';
 
   try {
-    await notificationService.sendNotification(
+    await notificationService.notifyBookingAccepted(
       booking.userId._id,
-      'Booking Accepted',
-      `${driverName} accepted your booking! Your verification code: ${verificationCode}`,
-      'booking_accepted',
-      {
-        bookingId: booking._id,
-        driverId: driver._id,
-        verificationCode: verificationCode
-      }
+      booking._id,
+      driverName,
+      verificationCode
     );
     console.log('[AcceptBooking] Booking acceptance notification sent to user with verification code');
   } catch (notifError) {

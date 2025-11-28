@@ -109,14 +109,18 @@ class NotificationService {
   /**
    * Notify user about booking acceptance
    */
-  async notifyBookingAccepted(userId, bookingId, driverName) {
+  async notifyBookingAccepted(userId, bookingId, driverName, verificationCode) {
+    const message = verificationCode
+      ? `${driverName} accepted your booking! Your verification code: ${verificationCode}`
+      : `Driver ${driverName} has accepted your request. Payment required within 5 minutes.`;
+
     return this.createNotification({
       userId,
       bookingId,
       type: NOTIFICATION_TYPE.BOOKING_ACCEPTED,
       title: 'Booking Accepted',
-      message: `Driver ${driverName} has accepted your request. Payment required within 5 minutes.`,
-      data: { bookingId, driverName }
+      message,
+      data: { bookingId, driverName, verificationCode }
     });
   }
 
