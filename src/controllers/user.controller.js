@@ -315,14 +315,8 @@ exports.getRideHistory = asyncHandler(async (req, res) => {
       query.status = status;
     }
   } else {
-    // Default: Show only completed and cancelled trips (not active trips)
-    query.status = {
-      $in: [
-        BOOKING_STATUS.COMPLETED,
-        BOOKING_STATUS.CANCELLED_BY_USER,
-        BOOKING_STATUS.CANCELLED_BY_DRIVER
-      ]
-    };
+    // Default: Show only completed trips
+    query.status = BOOKING_STATUS.COMPLETED;
   }
 
   // Filter by date range
