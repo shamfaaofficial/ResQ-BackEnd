@@ -98,6 +98,18 @@ router.delete(
 );
 
 /**
+ * BOOKING HISTORY ROUTES
+ */
+
+// Get user ride history (protected - user only)
+router.get(
+  '/bookings/history',
+  authMiddleware,
+  roleMiddleware('user'),
+  userController.getRideHistory
+);
+
+/**
  * UTILITY ROUTES
  */
 

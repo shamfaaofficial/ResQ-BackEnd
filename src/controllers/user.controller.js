@@ -271,4 +271,154 @@ exports.deleteAccount = asyncHandler(async (req, res) => {
   });
 });
 
+// Get user ride history
+exports.getRideHistory = asyncHandler(async (req, res) => {
+  const Booking = require('../models/Booking');
+  const { BOOKING_STATUS, PAGINATION } = require('../config/constants');
+
+  const user = await User.findById(req.userId);
+  if (!user) {
+    throw new NotFoundError('User not found');
+  }
+
+  // Query parameters
+  const {
+    page = PAGINATION.DEFAULT_PAGE,
+    limit = PAGINATION.DEFAULT_LIMIT,
+    status,
+    startDate,
+    endDate,
+    sortBy = 'createdAt',
+    sortOrder = 'desc'
+  } = req.query;
+
+  // Validate pagination
+  const pageNum = Math.max(1, parseInt(page));
+  const limitNum = Math.min(parseInt(limit) || PAGINATION.DEFAULT_LIMIT, PAGINATION.MAX_LIMIT);
+  const skip = (pageNum - 1) * limitNum;
+
+  // Build query
+  const query = { userId: req.userId };
+
+  // Filter by status (completed, cancelled_by_user, cancelled_by_driver)
+  if (status) {
+    // Allow filtering by specific status or multiple statuses
+    if (Array.isArray(status)) {
+      query.status = { $in: status };
+    } else if (status === 'completed') {
+      query.status = BOOKING_STATUS.COMPLETED;
+    } else if (status === 'cancelled') {
+      query.status = {
+        $in: [BOOKING_STATUS.CANCELLED_BY_USER, BOOKING_STATUS.CANCELLED_BY_DRIVER]
+      };
+    } else {
+      query.status = status;
+    }
+  } else {
+    // Default: Show only completed and cancelled trips (not active trips)
+    query.status = {
+      $in: [
+        BOOKING_STATUS.COMPLETED,
+        BOOKING_STATUS.CANCELLED_BY_USER,
+        BOOKING_STATUS.CANCELLED_BY_DRIVER
+      ]
+    };
+  }
+
+  // Filter by date range
+  if (startDate || endDate) {
+    query.createdAt = {};
+    if (startDate) {
+      query.createdAt.$gte = new Date(startDate);
+    }
+    if (endDate) {
+      // Include the entire end date (set to end of day)
+      const endDateTime = new Date(endDate);
+      endDateTime.setHours(23, 59, 59, 999);
+      query.createdAt.$lte = endDateTime;
+    }
+  }
+
+  // Sort configuration
+  const sortConfig = {};
+  const validSortFields = ['createdAt', 'completedAt', 'totalAmount'];
+  const sortField = validSortFields.includes(sortBy) ? sortBy : 'createdAt';
+
+  // Map sortBy to actual field paths
+  const sortFieldMap = {
+    'createdAt': 'createdAt',
+    'completedAt': 'timeline.completedAt',
+    'totalAmount': 'pricing.totalAmount'
+  };
+
+  sortConfig[sortFieldMap[sortField]] = sortOrder === 'asc' ? 1 : -1;
+
+  // Execute queries in parallel
+  const [bookings, totalCount] = await Promise.all([
+    Booking.find(query)
+      .populate('driverId', 'vehicleDetails currentLocation userId')
+      .populate({
+        path: 'driverId',
+        populate: {
+          path: 'userId',
+          select: 'phoneNumber profile'
+        }
+      })
+      .select('-__v -verificationCode')
+      .sort(sortConfig)
+      .skip(skip)
+      .limit(limitNum)
+      .lean(),
+    Booking.countDocuments(query)
+  ]);
+
+  // Calculate statistics
+  const mongoose = require('mongoose');
+  const stats = await Booking.aggregate([
+    { $match: { userId: new mongoose.Types.ObjectId(req.userId) } },
+    {
+      $group: {
+        _id: '$status',
+        count: { $sum: 1 },
+        totalSpent: {
+          $sum: {
+            $cond: [
+              { $eq: ['$status', BOOKING_STATUS.COMPLETED] },
+              '$pricing.totalAmount',
+              0
+            ]
+          }
+        }
+      }
+    }
+  ]);
+
+  // Format stats
+  const statistics = {
+    totalCompleted: stats.find(s => s._id === BOOKING_STATUS.COMPLETED)?.count || 0,
+    totalCancelled: (
+      (stats.find(s => s._id === BOOKING_STATUS.CANCELLED_BY_USER)?.count || 0) +
+      (stats.find(s => s._id === BOOKING_STATUS.CANCELLED_BY_DRIVER)?.count || 0)
+    ),
+    totalSpent: stats.find(s => s._id === BOOKING_STATUS.COMPLETED)?.totalSpent || 0,
+    totalTrips: stats.reduce((sum, s) => sum + s.count, 0)
+  };
+
+  res.status(200).json({
+    success: true,
+    data: {
+      rides: bookings,
+      pagination: {
+        currentPage: pageNum,
+        totalPages: Math.ceil(totalCount / limitNum),
+        totalRecords: totalCount,
+        recordsPerPage: limitNum,
+        hasNextPage: pageNum < Math.ceil(totalCount / limitNum),
+        hasPreviousPage: pageNum > 1
+      },
+      statistics
+    }
+  });
+});
+
 module.exports = exports;
