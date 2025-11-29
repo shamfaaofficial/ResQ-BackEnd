@@ -598,7 +598,7 @@ exports.cancelBooking = asyncHandler(async (req, res) => {
   }
 
   // Check if booking can be cancelled
-  if ([BOOKING_STATUS.COMPLETED, BOOKING_STATUS.CANCELLED_BY_USER, BOOKING_STATUS.CANCELLED_BY_DRIVER].includes(booking.status)) {
+  if ([BOOKING_STATUS.COMPLETED, BOOKING_STATUS.CANCELLED_BY_USER, BOOKING_STATUS.CANCELLED_BY_DRIVER, BOOKING_STATUS.EXPIRED].includes(booking.status)) {
     throw new ValidationError('Booking cannot be cancelled');
   }
 
@@ -687,7 +687,7 @@ exports.userForceCancel = asyncHandler(async (req, res) => {
   console.log('[UserForceCancel] Current booking status:', booking.status);
 
   // Only block if already completed or cancelled
-  if ([BOOKING_STATUS.COMPLETED, BOOKING_STATUS.CANCELLED_BY_USER, BOOKING_STATUS.CANCELLED_BY_DRIVER].includes(booking.status)) {
+  if ([BOOKING_STATUS.COMPLETED, BOOKING_STATUS.CANCELLED_BY_USER, BOOKING_STATUS.CANCELLED_BY_DRIVER, BOOKING_STATUS.EXPIRED].includes(booking.status)) {
     throw new ValidationError('Booking already completed or cancelled');
   }
 
@@ -1629,7 +1629,7 @@ exports.cancelBookingByDriver = asyncHandler(async (req, res) => {
   console.log('[CancelBookingByDriver] Current payment status:', booking.payment?.status);
   console.log('[CancelBookingByDriver] Payment details:', JSON.stringify(booking.payment, null, 2));
 
-  if ([BOOKING_STATUS.COMPLETED, BOOKING_STATUS.CANCELLED_BY_USER, BOOKING_STATUS.CANCELLED_BY_DRIVER].includes(booking.status)) {
+  if ([BOOKING_STATUS.COMPLETED, BOOKING_STATUS.CANCELLED_BY_USER, BOOKING_STATUS.CANCELLED_BY_DRIVER, BOOKING_STATUS.EXPIRED].includes(booking.status)) {
     console.log('[CancelBookingByDriver] ❌ Booking cannot be cancelled - already in final state');
     throw new ValidationError('Booking cannot be cancelled');
   }
@@ -1799,7 +1799,7 @@ exports.forceComplete = asyncHandler(async (req, res) => {
   console.log('[ForceComplete] Current booking status:', booking.status);
 
   // Only block if already completed or cancelled
-  if ([BOOKING_STATUS.COMPLETED, BOOKING_STATUS.CANCELLED_BY_USER, BOOKING_STATUS.CANCELLED_BY_DRIVER].includes(booking.status)) {
+  if ([BOOKING_STATUS.COMPLETED, BOOKING_STATUS.CANCELLED_BY_USER, BOOKING_STATUS.CANCELLED_BY_DRIVER, BOOKING_STATUS.EXPIRED].includes(booking.status)) {
     throw new ValidationError('Booking already completed or cancelled');
   }
 
@@ -1915,7 +1915,7 @@ exports.forceCancel = asyncHandler(async (req, res) => {
   console.log('[ForceCancel] Current booking status:', booking.status);
 
   // Only block if already cancelled or completed
-  if ([BOOKING_STATUS.COMPLETED, BOOKING_STATUS.CANCELLED_BY_USER, BOOKING_STATUS.CANCELLED_BY_DRIVER].includes(booking.status)) {
+  if ([BOOKING_STATUS.COMPLETED, BOOKING_STATUS.CANCELLED_BY_USER, BOOKING_STATUS.CANCELLED_BY_DRIVER, BOOKING_STATUS.EXPIRED].includes(booking.status)) {
     throw new ValidationError('Booking already completed or cancelled');
   }
 

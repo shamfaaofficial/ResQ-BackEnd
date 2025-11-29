@@ -82,7 +82,7 @@ exports.getDashboardStats = asyncHandler(async (req, res) => {
     Booking.countDocuments({ createdAt: { $gte: startOfMonth } }),
     Booking.countDocuments({ status: BOOKING_STATUS.COMPLETED }),
     Booking.countDocuments({
-      status: { $in: [BOOKING_STATUS.CANCELLED_BY_USER, BOOKING_STATUS.CANCELLED_BY_DRIVER] }
+      status: { $in: [BOOKING_STATUS.CANCELLED_BY_USER, BOOKING_STATUS.CANCELLED_BY_DRIVER, BOOKING_STATUS.EXPIRED] }
     }),
     Booking.countDocuments({ status: BOOKING_STATUS.IN_PROGRESS }),
     Booking.countDocuments({ status: BOOKING_STATUS.REQUESTED }),

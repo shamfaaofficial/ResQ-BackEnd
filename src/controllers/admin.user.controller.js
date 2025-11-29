@@ -81,7 +81,7 @@ exports.getUserById = asyncHandler(async (req, res) => {
     });
     const cancelledBookings = await Booking.countDocuments({
       userId: user._id,
-      status: { $in: ['cancelled_by_user', 'cancelled_by_driver'] }
+      status: { $in: ['cancelled_by_user', 'cancelled_by_driver', 'expired'] }
     });
 
     stats = {

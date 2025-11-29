@@ -309,7 +309,7 @@ exports.getRideHistory = asyncHandler(async (req, res) => {
       query.status = BOOKING_STATUS.COMPLETED;
     } else if (status === 'cancelled') {
       query.status = {
-        $in: [BOOKING_STATUS.CANCELLED_BY_USER, BOOKING_STATUS.CANCELLED_BY_DRIVER]
+        $in: [BOOKING_STATUS.CANCELLED_BY_USER, BOOKING_STATUS.CANCELLED_BY_DRIVER, BOOKING_STATUS.EXPIRED]
       };
     } else {
       query.status = status;

@@ -21,7 +21,7 @@ cron.schedule('* * * * *', async () => {
         booking.payment.failedAt = now;
       }
 
-      booking.status = BOOKING_STATUS.CANCELLED_BY_DRIVER;
+      booking.status = BOOKING_STATUS.EXPIRED;
       booking.cancellationDetails = {
         cancelledBy: 'system',
         reason: 'No driver accepted within 1 minute',

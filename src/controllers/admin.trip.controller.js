@@ -279,7 +279,7 @@ exports.cancelTrip = asyncHandler(async (req, res) => {
   }
 
   // Check if trip can be cancelled
-  if ([BOOKING_STATUS.COMPLETED, BOOKING_STATUS.CANCELLED_BY_USER, BOOKING_STATUS.CANCELLED_BY_DRIVER].includes(trip.status)) {
+  if ([BOOKING_STATUS.COMPLETED, BOOKING_STATUS.CANCELLED_BY_USER, BOOKING_STATUS.CANCELLED_BY_DRIVER, BOOKING_STATUS.EXPIRED].includes(trip.status)) {
     throw new ValidationError('Trip cannot be cancelled');
   }
 

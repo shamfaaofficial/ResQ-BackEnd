@@ -21,6 +21,7 @@ module.exports = {
     COMPLETED: 'completed',
     CANCELLED_BY_USER: 'cancelled_by_user',
     CANCELLED_BY_DRIVER: 'cancelled_by_driver',
+    EXPIRED: 'expired',
     PAYMENT_PENDING: 'payment_pending',
     PAYMENT_COMPLETED: 'payment_completed'
   },
