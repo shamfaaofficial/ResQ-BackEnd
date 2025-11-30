@@ -3,6 +3,7 @@ const router = express.Router();
 const driverController = require('../controllers/driver.controller');
 const authController = require('../controllers/auth.controller');
 const driverDocumentController = require('../controllers/driver.document.controller');
+const ratingController = require('../controllers/rating.controller');
 const { authMiddleware, roleMiddleware } = require('../middlewares/auth');
 const { locationUpdateLimiter } = require('../middlewares/rateLimiter');
 const multer = require('multer');
@@ -115,6 +116,34 @@ router.get(
   authMiddleware,
   roleMiddleware('driver'),
   driverController.getRideHistory
+);
+
+/**
+ * RATING ROUTES
+ */
+
+// Submit rating for user (protected - driver only)
+router.post(
+  '/rate-user/:bookingId',
+  authMiddleware,
+  roleMiddleware('driver'),
+  ratingController.rateUser
+);
+
+// Get my rating statistics (protected - driver only)
+router.get(
+  '/my-stats',
+  authMiddleware,
+  roleMiddleware('driver'),
+  ratingController.getMyStats
+);
+
+// Get my reviews (protected - driver only)
+router.get(
+  '/my-reviews',
+  authMiddleware,
+  roleMiddleware('driver'),
+  ratingController.getMyReviews
 );
 
 /**

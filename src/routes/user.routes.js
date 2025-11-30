@@ -3,6 +3,7 @@ const router = express.Router();
 const bookingController = require('../controllers/booking.controller');
 const authController = require('../controllers/auth.controller');
 const userController = require('../controllers/user.controller');
+const ratingController = require('../controllers/rating.controller');
 const { authMiddleware, roleMiddleware } = require('../middlewares/auth');
 
 /**
@@ -107,6 +108,26 @@ router.get(
   authMiddleware,
   roleMiddleware('user'),
   userController.getRideHistory
+);
+
+/**
+ * RATING ROUTES
+ */
+
+// Submit rating for driver (protected - user only)
+router.post(
+  '/rate-driver/:bookingId',
+  authMiddleware,
+  roleMiddleware('user'),
+  ratingController.rateDriver
+);
+
+// Get my ratings (protected - user only)
+router.get(
+  '/my-ratings',
+  authMiddleware,
+  roleMiddleware('user'),
+  ratingController.getMyRatings
 );
 
 /**

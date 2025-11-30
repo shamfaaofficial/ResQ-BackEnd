@@ -8,7 +8,7 @@ const { BOOKING_STATUS } = require('../config/constants');
 
 /**
  * USER: Submit rating for driver
- * POST /api/v1/ratings/driver/:bookingId
+ * POST /api/v1/user/rate-driver/:bookingId
  */
 exports.rateDriver = asyncHandler(async (req, res) => {
   const { bookingId } = req.params;
@@ -96,7 +96,7 @@ exports.rateDriver = asyncHandler(async (req, res) => {
 
 /**
  * DRIVER: Submit rating for user
- * POST /api/v1/ratings/user/:bookingId
+ * POST /api/v1/driver/rate-user/:bookingId
  */
 exports.rateUser = asyncHandler(async (req, res) => {
   const { bookingId } = req.params;
