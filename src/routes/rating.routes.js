@@ -27,6 +27,22 @@ router.post(
   ratingController.rateUser
 );
 
+// Get my rating statistics (protected - driver only)
+router.get(
+  '/my-stats',
+  authMiddleware,
+  roleMiddleware('driver'),
+  ratingController.getMyStats
+);
+
+// Get my reviews (protected - driver only)
+router.get(
+  '/my-reviews',
+  authMiddleware,
+  roleMiddleware('driver'),
+  ratingController.getMyReviews
+);
+
 /**
  * SHARED ROUTES
  */

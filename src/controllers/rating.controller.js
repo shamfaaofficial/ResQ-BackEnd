@@ -354,6 +354,166 @@ exports.getMyRatings = asyncHandler(async (req, res) => {
 });
 
 /**
+ * DRIVER: Get my rating statistics and profile
+ * GET /api/v1/ratings/my-stats
+ */
+exports.getMyStats = asyncHandler(async (req, res) => {
+  // Get driver profile
+  const driver = await Driver.findOne({ userId: req.userId })
+    .select('rating userId vehicleDetails')
+    .populate('userId', 'phoneNumber profile');
+
+  if (!driver) {
+    throw new NotFoundError('Driver profile not found');
+  }
+
+  // Get total ratings breakdown
+  const ratings = await Rating.find({
+    ratedDriver: driver._id,
+    ratedByRole: 'user'
+  });
+
+  // Calculate additional stats
+  let recentRatingsCount = 0;
+  let last30DaysAvg = 0;
+
+  if (ratings.length > 0) {
+    // Get ratings from last 30 days
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const recentRatings = ratings.filter(r => r.createdAt >= thirtyDaysAgo);
+    recentRatingsCount = recentRatings.length;
+
+    if (recentRatingsCount > 0) {
+      const recentSum = recentRatings.reduce((sum, r) => sum + r.driverRating.overall, 0);
+      last30DaysAvg = (recentSum / recentRatingsCount).toFixed(2);
+    }
+  }
+
+  res.status(200).json({
+    success: true,
+    data: {
+      driver: {
+        id: driver._id,
+        phoneNumber: driver.userId.phoneNumber,
+        profile: driver.userId.profile,
+        vehicleDetails: driver.vehicleDetails
+      },
+      ratingStats: {
+        overall: {
+          average: driver.rating.average,
+          totalRatings: driver.rating.totalRatings,
+          last30DaysAverage: last30DaysAvg,
+          last30DaysCount: recentRatingsCount
+        },
+        categories: {
+          professionalism: driver.rating.professionalism,
+          serviceQuality: driver.rating.serviceQuality,
+          timeliness: driver.rating.timeliness,
+          vehicleHandling: driver.rating.vehicleHandling
+        },
+        starDistribution: {
+          fiveStars: driver.rating.fiveStars,
+          fourStars: driver.rating.fourStars,
+          threeStars: driver.rating.threeStars,
+          twoStars: driver.rating.twoStars,
+          oneStar: driver.rating.oneStar
+        },
+        percentages: {
+          fiveStarPercent: driver.rating.totalRatings > 0
+            ? ((driver.rating.fiveStars / driver.rating.totalRatings) * 100).toFixed(1)
+            : 0,
+          fourStarPercent: driver.rating.totalRatings > 0
+            ? ((driver.rating.fourStars / driver.rating.totalRatings) * 100).toFixed(1)
+            : 0,
+          threeStarPercent: driver.rating.totalRatings > 0
+            ? ((driver.rating.threeStars / driver.rating.totalRatings) * 100).toFixed(1)
+            : 0,
+          twoStarPercent: driver.rating.totalRatings > 0
+            ? ((driver.rating.twoStars / driver.rating.totalRatings) * 100).toFixed(1)
+            : 0,
+          oneStarPercent: driver.rating.totalRatings > 0
+            ? ((driver.rating.oneStar / driver.rating.totalRatings) * 100).toFixed(1)
+            : 0
+        }
+      }
+    }
+  });
+});
+
+/**
+ * DRIVER: Get my reviews (what users said about me)
+ * GET /api/v1/ratings/my-reviews
+ */
+exports.getMyReviews = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 10, minRating } = req.query;
+
+  // Get driver profile
+  const driver = await Driver.findOne({ userId: req.userId });
+  if (!driver) {
+    throw new NotFoundError('Driver profile not found');
+  }
+
+  const query = {
+    ratedDriver: driver._id,
+    ratedByRole: 'user'
+  };
+
+  // Filter by minimum rating
+  if (minRating) {
+    query['driverRating.overall'] = { $gte: parseInt(minRating) };
+  }
+
+  const skip = (parseInt(page) - 1) * parseInt(limit);
+
+  const [ratings, total] = await Promise.all([
+    Rating.find(query)
+      .populate('ratedUser', 'phoneNumber profile')
+      .populate('bookingId', 'bookingNumber createdAt completedAt')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit)),
+    Rating.countDocuments(query)
+  ]);
+
+  res.status(200).json({
+    success: true,
+    data: {
+      reviews: ratings.map(r => ({
+        id: r._id,
+        booking: {
+          bookingNumber: r.bookingId?.bookingNumber,
+          completedAt: r.bookingId?.completedAt
+        },
+        user: {
+          name: r.ratedUser?.profile?.firstName
+            ? `${r.ratedUser.profile.firstName} ${r.ratedUser.profile.lastName || ''}`.trim()
+            : 'User',
+          phoneNumber: r.ratedUser?.phoneNumber
+        },
+        rating: {
+          professionalism: r.driverRating.professionalism,
+          serviceQuality: r.driverRating.serviceQuality,
+          timeliness: r.driverRating.timeliness,
+          vehicleHandling: r.driverRating.vehicleHandling,
+          overall: r.driverRating.overall,
+          feedback: r.driverRating.feedback,
+          tags: r.driverRating.tags
+        },
+        createdAt: r.createdAt
+      })),
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    }
+  });
+});
+
+/**
  * Helper function to update driver rating statistics
  */
 async function updateDriverRatingStats(driverId) {
