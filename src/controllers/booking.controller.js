@@ -2179,6 +2179,7 @@ exports.requestSpecificDriver = asyncHandler(async (req, res) => {
       },
       eta: driverToPickup.duration,
       expiresAt: booking.requestExpiresAt,
+      requestExpiresAt: booking.requestExpiresAt,  // Explicit field for clarity
       userId: booking.userId._id.toString(),
       user: {
         id: booking.userId._id.toString(),

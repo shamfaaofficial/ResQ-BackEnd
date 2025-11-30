@@ -190,6 +190,7 @@ const emitNewBookingRequest = (driverId, bookingData) => {
   console.log(`   Vehicle Type: ${bookingData.vehicleType}`);
   console.log(`   Total Amount: ${bookingData.pricing?.total} QAR`);
   console.log(`   ETA: ${bookingData.eta} minutes`);
+  console.log(`   Request Expires At: ${bookingData.requestExpiresAt || bookingData.expiresAt}`);
   console.log(`   User ID: ${bookingData.userId}`);
   console.log(`   Timestamp: ${timestamp}`);
   console.log(`\n📦 Full Payload:`);
