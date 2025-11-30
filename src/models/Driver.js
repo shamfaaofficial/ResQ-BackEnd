@@ -142,7 +142,38 @@ const driverSchema = new mongoose.Schema({
     totalRatings: {
       type: Number,
       default: 0
-    }
+    },
+    // Detailed breakdown
+    professionalism: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 5
+    },
+    serviceQuality: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 5
+    },
+    timeliness: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 5
+    },
+    vehicleHandling: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 5
+    },
+    // Star distribution for analytics
+    fiveStars: { type: Number, default: 0 },
+    fourStars: { type: Number, default: 0 },
+    threeStars: { type: Number, default: 0 },
+    twoStars: { type: Number, default: 0 },
+    oneStar: { type: Number, default: 0 }
   },
   earnings: {
     totalEarnings: {
