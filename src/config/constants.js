@@ -81,7 +81,7 @@ module.exports = {
 
   OTP_EXPIRY_MINUTES: 5,
   OTP_MAX_ATTEMPTS: 3,
-  BOOKING_REQUEST_TIMEOUT_SECONDS: 60,
+  BOOKING_REQUEST_TIMEOUT_SECONDS: 20,
   PAYMENT_TIMEOUT_SECONDS: 300,
 
   // Location validation thresholds (in meters)
