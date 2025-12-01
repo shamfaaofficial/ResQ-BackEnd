@@ -107,6 +107,31 @@ if (process.env.NODE_ENV === 'development') {
 // Rate limiting
 app.use('/api', generalLimiter);
 
+// Block suspicious paths (security)
+app.use((req, res, next) => {
+  const suspiciousPaths = [
+    '/.env',
+    '/.git',
+    '/config',
+    '/.aws',
+    '/admin',
+    '/phpmyadmin',
+    '/wp-admin',
+    '/.htaccess',
+    '/web.config',
+    '/.ssh',
+    '/backup',
+    '/.vscode',
+    '/node_modules'
+  ];
+
+  if (suspiciousPaths.some(path => req.path.toLowerCase().startsWith(path))) {
+    console.warn(`[Security] Blocked suspicious request: ${req.method} ${req.path} from IP: ${req.ip}`);
+    return res.status(404).json({ success: false, error: 'Not found' });
+  }
+  next();
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   const firebaseConfig = require('./config/firebase');
