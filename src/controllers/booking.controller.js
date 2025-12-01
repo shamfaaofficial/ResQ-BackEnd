@@ -1082,36 +1082,9 @@ exports.acceptBooking = asyncHandler(async (req, res) => {
   // Set payment expiry after acceptance (user should pay within 5 minutes)
   booking.paymentExpiresAt = new Date(Date.now() + PAYMENT_TIMEOUT_SECONDS * 1000);
 
-  // ============================================================
-  // AUTO-COMPLETE PAYMENT (TEMPORARY - FOR DEVELOPMENT/TESTING)
-  // TODO: Remove this in production - payment should come from user
-  // ============================================================
-  console.log('[AcceptBooking] Auto-completing payment for development...');
-  booking.status = BOOKING_STATUS.PAYMENT_COMPLETED;
-  booking.timeline.paymentCompletedAt = new Date();
-  booking.payment = {
-    status: 'completed',
-    method: 'Auto-completed (Development)',
-    gateway: 'N/A',
-    paidAmount: booking.pricing.totalAmount,
-    paidAt: new Date(),
-    gatewayResponse: { note: 'Auto-completed for testing' }
-  };
-  // IMPORTANT: Clear payment expiry since payment is already completed
-  booking.paymentExpiresAt = null;
-
-  // Generate 4-digit verification code immediately (for user to see in advance)
-  const verificationCode = Math.floor(1000 + Math.random() * 9000).toString();
-  booking.verificationCode = {
-    code: verificationCode,
-    generatedAt: new Date(),
-    isVerified: false
-  };
-  console.log('[AcceptBooking] ✅ Verification code generated:', verificationCode);
-
   await booking.save();
   console.log('[AcceptBooking] ✅ Booking saved with status:', booking.status);
-  console.log('[AcceptBooking] ✅ Payment status:', booking.payment.status);
+  console.log('[AcceptBooking] ⏳ Payment expires at:', booking.paymentExpiresAt);
   console.log('[AcceptBooking] ✅ Booking ID:', booking._id);
   console.log('[AcceptBooking] ✅ Driver ID:', booking.driverId);
 
