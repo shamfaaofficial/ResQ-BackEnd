@@ -35,20 +35,49 @@ class MyFatoorahPaymentService {
       const callbackUrl = `${process.env.APP_BASE_URL || 'https://dev.resq-qa.com'}/api/v1/payment/callback`;
       const errorUrl = `${process.env.APP_BASE_URL || 'https://dev.resq-qa.com'}/api/v1/payment/error`;
 
+      // Extract mobile number without country code
+      let customerMobile = user.phoneNumber;
+      let mobileCountryCode = '+974'; // Default Qatar
+
+      // Remove common country codes and extract number
+      if (customerMobile.startsWith('+974')) {
+        customerMobile = customerMobile.replace('+974', '');
+        mobileCountryCode = '+974';
+      } else if (customerMobile.startsWith('+91')) {
+        customerMobile = customerMobile.replace('+91', '');
+        mobileCountryCode = '+91';
+      } else if (customerMobile.startsWith('+')) {
+        // Extract country code and number
+        const match = customerMobile.match(/^(\+\d{1,4})(\d+)$/);
+        if (match) {
+          mobileCountryCode = match[1];
+          customerMobile = match[2];
+        }
+      }
+
+      // Ensure mobile number is max 11 characters
+      if (customerMobile.length > 11) {
+        customerMobile = customerMobile.substring(customerMobile.length - 11);
+      }
+
       const payload = {
         NotificationOption: 'LNK',
         InvoiceValue: booking.pricing.totalAmount,
         CustomerName: user.profile?.firstName || user.phoneNumber,
-        CustomerMobile: user.phoneNumber.replace('+974', ''),
-        CustomerEmail: user.email || '',
+        CustomerMobile: customerMobile,
         CallBackUrl: callbackUrl,
         ErrorUrl: errorUrl,
         Language: 'en',
         DisplayCurrencyIso: 'QAR',
-        MobileCountryCode: '+974',
+        MobileCountryCode: mobileCountryCode,
         CustomerReference: booking._id.toString(),
         UserDefinedField: booking.bookingNumber
       };
+
+      // Only add CustomerEmail if it's a valid email
+      if (user.email && user.email.includes('@')) {
+        payload.CustomerEmail = user.email;
+      }
 
       console.log('🔄 Initiating MyFatoorah payment:', payload);
 
