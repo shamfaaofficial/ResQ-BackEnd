@@ -21,6 +21,17 @@ class MyFatoorahPaymentService {
    */
   async initiatePayment(booking, user) {
     try {
+      // Debug: Check if API key is loaded
+      console.log('🔑 MyFatoorah API Key Check:');
+      console.log('   - API Key exists:', !!this.apiKey);
+      console.log('   - API Key length:', this.apiKey?.length || 0);
+      console.log('   - API Key preview:', this.apiKey ? `${this.apiKey.substring(0, 20)}...` : 'MISSING');
+      console.log('   - Base URL:', this.baseURL);
+
+      if (!this.apiKey || this.apiKey === 'your_al_fatoorah_api_key_here') {
+        throw new Error('MyFatoorah API key is not configured. Please set AL_FATOORAH_API_KEY in environment variables.');
+      }
+
       const callbackUrl = `${process.env.APP_BASE_URL || 'https://dev.resq-qa.com'}/api/v1/payment/callback`;
       const errorUrl = `${process.env.APP_BASE_URL || 'https://dev.resq-qa.com'}/api/v1/payment/error`;
 
@@ -60,7 +71,16 @@ class MyFatoorahPaymentService {
         throw new Error(response.data.Message || 'Payment initiation failed');
       }
     } catch (error) {
-      console.error('❌ MyFatoorah payment initiation error:', error.response?.data || error.message);
+      console.error('❌ MyFatoorah payment initiation error:');
+      console.error('   - Status:', error.response?.status);
+      console.error('   - Status Text:', error.response?.statusText);
+      console.error('   - Response Data:', JSON.stringify(error.response?.data, null, 2));
+      console.error('   - Error Message:', error.message);
+
+      if (error.response?.status === 401) {
+        throw new Error('MyFatoorah API authentication failed. Please verify your API key is correct and has not expired.');
+      }
+
       throw new Error(`Payment initiation failed: ${error.response?.data?.Message || error.message}`);
     }
   }
