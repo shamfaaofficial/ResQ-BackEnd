@@ -204,9 +204,10 @@ exports.getPaymentDetails = asyncHandler(async (req, res) => {
   const driver = await Driver.findOne({ userId: req.userId });
   const isDriver = driver && booking.driverId && booking.driverId.toString() === driver._id.toString();
 
-  // Handle both populated and non-populated userId
+  // Handle both populated and non-populated userId - ALWAYS convert to string for comparison
   const bookingUserId = booking.userId._id ? booking.userId._id.toString() : booking.userId.toString();
-  const isUser = bookingUserId === req.userId;
+  const requestUserId = req.userId.toString(); // Convert ObjectId to string
+  const isUser = bookingUserId === requestUserId;
 
   console.log('[GetPaymentDetails] Authorization check:');
   console.log('  - req.userId:', req.userId);
