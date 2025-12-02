@@ -174,6 +174,7 @@ exports.checkPaymentStatus = asyncHandler(async (req, res) => {
         isExpired: isExpired,
         amount: booking.pricing.totalAmount,
         currency: booking.pricing.currency,
+        initiatedAt: booking.payment?.initiatedAt,
         paidAt: booking.payment?.paidAt,
         transactionId: booking.payment?.transactionId,
         expiresAt: booking.paymentExpiresAt,
@@ -232,6 +233,7 @@ exports.getPaymentDetails = asyncHandler(async (req, res) => {
         invoiceId: booking.payment?.invoiceId,
         amount: booking.payment?.paidAmount || booking.pricing.totalAmount,
         currency: booking.pricing.currency,
+        initiatedAt: booking.payment?.initiatedAt,
         paidAt: booking.payment?.paidAt,
         failedAt: booking.payment?.failedAt
       },
@@ -318,6 +320,7 @@ exports.initiatePayment = asyncHandler(async (req, res) => {
         invoiceId: paymentResponse.invoiceId,
         amount: booking.pricing.totalAmount,
         currency: booking.pricing.currency || 'QAR',
+        initiatedAt: booking.payment.initiatedAt,
         expiresAt: booking.paymentExpiresAt
       }
     });
