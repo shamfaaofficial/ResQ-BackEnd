@@ -1763,18 +1763,11 @@ exports.forceComplete = asyncHandler(async (req, res) => {
   console.log('\n========== FORCE COMPLETE (TESTING ONLY) ==========');
   console.log('[ForceComplete] Booking ID:', bookingId);
 
-  const driver = await Driver.findOne({ userId: req.userId });
-  if (!driver) {
-    throw new NotFoundError('Driver profile not found');
-  }
-
-  const booking = await Booking.findOne({
-    _id: bookingId,
-    driverId: driver._id
-  });
+  // No auth required - find booking directly
+  const booking = await Booking.findById(bookingId);
 
   if (!booking) {
-    throw new NotFoundError('Booking not found or not assigned to you');
+    throw new NotFoundError('Booking not found');
   }
 
   console.log('[ForceComplete] Current booking status:', booking.status);
@@ -1804,34 +1797,47 @@ exports.forceComplete = asyncHandler(async (req, res) => {
 
   await booking.save();
 
-  // Update driver earnings and set as not busy
-  driver.earnings.totalEarnings += booking.driverEarnings;
-  driver.earnings.availableBalance += booking.driverEarnings;
-  driver.isBusy = false; // Driver is now available
-  await driver.save();
+  // Update driver earnings and set as not busy (if driver exists)
+  if (booking.driverId) {
+    const driver = await Driver.findById(booking.driverId);
+    if (driver) {
+      driver.earnings.totalEarnings += booking.driverEarnings;
+      driver.earnings.availableBalance += booking.driverEarnings;
+      driver.isBusy = false; // Driver is now available
+      await driver.save();
+
+      // Clear Redis cache for active booking
+      if (isRedisAvailable()) {
+        try {
+          await redisService.clearActiveBooking(driver._id);
+          console.log('[ForceComplete] Cleared Redis cache for driver:', driver._id);
+        } catch (redisError) {
+          console.error('[ForceComplete] Failed to clear Redis cache:', redisError.message);
+        }
+      }
+    }
+  }
 
   console.log('[ForceComplete] ✅ Booking force completed successfully');
   console.log('[ForceComplete] Driver earnings:', booking.driverEarnings);
   console.log('[ForceComplete] Platform commission:', booking.platformCommission);
 
-  // Clear Redis cache for active booking
-  if (isRedisAvailable()) {
-    try {
-      await redisService.clearActiveBooking(driver._id);
-      console.log('[ForceComplete] Cleared Redis cache for driver:', driver._id);
-    } catch (redisError) {
-      console.error('[ForceComplete] Failed to clear Redis cache:', redisError.message);
-    }
-  }
-
   // Populate user and driver details
   await booking.populate('userId', 'phoneNumber profile fcmToken');
-  await driver.populate('userId', 'phoneNumber profile');
+  if (booking.driverId) {
+    await booking.populate({
+      path: 'driverId',
+      populate: { path: 'userId', select: 'phoneNumber profile' }
+    });
+  }
 
-  // Send notification
-  const driverName = driver.userId?.profile?.firstName && driver.userId?.profile?.lastName
-    ? `${driver.userId.profile.firstName} ${driver.userId.profile.lastName}`
-    : driver.userId?.phoneNumber || 'Driver';
+  // Send notification (if driver details available)
+  let driverName = 'Driver';
+  if (booking.driverId?.userId?.profile?.firstName && booking.driverId?.userId?.profile?.lastName) {
+    driverName = `${booking.driverId.userId.profile.firstName} ${booking.driverId.userId.profile.lastName}`;
+  } else if (booking.driverId?.userId?.phoneNumber) {
+    driverName = booking.driverId.userId.phoneNumber;
+  }
 
   try {
     await notificationService.sendNotification(
