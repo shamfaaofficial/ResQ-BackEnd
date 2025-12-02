@@ -171,9 +171,9 @@ router.patch(
   bookingController.cancelBookingByDriver
 );
 
-// ⚠️ TESTING ONLY: Force complete trip (bypasses verification) - NO AUTH
+// ⚠️ TESTING ONLY: Force complete trip (bypasses verification) - NO AUTH REQUIRED
 router.patch(
-  '/driver/:bookingId/force-complete',
+  '/force-complete/:bookingId',
   bookingController.forceComplete
 );
 
