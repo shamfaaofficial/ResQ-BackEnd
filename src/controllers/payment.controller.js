@@ -420,6 +420,17 @@ exports.handlePaymentWebhook = asyncHandler(async (req, res) => {
         booking.status = BOOKING_STATUS.PAYMENT_COMPLETED;
         booking.timeline.paymentCompletedAt = new Date();
         booking.paymentExpiresAt = null;
+
+        // Generate 4-digit verification code for pickup
+        const verificationCode = Math.floor(1000 + Math.random() * 9000).toString();
+        booking.verificationCode = {
+          code: verificationCode,
+          generatedAt: new Date(),
+          isVerified: false
+        };
+
+        console.log(`[PaymentWebhook] 🔐 Generated verification code: ${verificationCode} for booking ${booking.bookingNumber}`);
+
         await booking.save();
 
         // Create transaction record

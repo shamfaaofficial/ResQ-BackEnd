@@ -189,6 +189,17 @@ class MyFatoorahPaymentService {
         booking.timeline.paymentCompletedAt = new Date();
         // IMPORTANT: Clear payment expiry since payment is now completed
         booking.paymentExpiresAt = null;
+
+        // Generate 4-digit verification code for pickup
+        const verificationCode = Math.floor(1000 + Math.random() * 9000).toString();
+        booking.verificationCode = {
+          code: verificationCode,
+          generatedAt: new Date(),
+          isVerified: false
+        };
+
+        console.log(`[PaymentCallback] 🔐 Generated verification code: ${verificationCode} for booking ${booking.bookingNumber}`);
+
         await booking.save();
 
         // Create transaction record

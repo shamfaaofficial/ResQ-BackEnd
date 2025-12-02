@@ -456,8 +456,8 @@ exports.getBookingLiveStatus = asyncHandler(async (req, res) => {
     throw new NotFoundError('Booking not found');
   }
 
-  // Only provide live updates for active bookings
-  if (![BOOKING_STATUS.ACCEPTED, BOOKING_STATUS.PAYMENT_COMPLETED, BOOKING_STATUS.DRIVER_ARRIVED, BOOKING_STATUS.IN_PROGRESS].includes(booking.status)) {
+  // Provide live updates for active bookings and show details for completed bookings
+  if (![BOOKING_STATUS.ACCEPTED, BOOKING_STATUS.PAYMENT_COMPLETED, BOOKING_STATUS.DRIVER_ARRIVED, BOOKING_STATUS.IN_PROGRESS, BOOKING_STATUS.COMPLETED].includes(booking.status)) {
     return res.status(200).json({
       success: true,
       data: {
@@ -523,6 +523,14 @@ exports.getBookingLiveStatus = asyncHandler(async (req, res) => {
     rating: driver.rating?.average || 0,
     totalRatings: driver.rating?.totalRatings || 0
   };
+
+  // Log verification code status
+  console.log(`[LiveStatus] Booking ${booking.bookingNumber} verification code:`, booking.verificationCode);
+  if (booking.verificationCode?.code) {
+    console.log(`[LiveStatus] ✅ Verification code exists: ${booking.verificationCode.code}`);
+  } else {
+    console.log(`[LiveStatus] ⚠️ No verification code found for booking ${booking.bookingNumber}`);
+  }
 
   res.status(200).json({
     success: true,
