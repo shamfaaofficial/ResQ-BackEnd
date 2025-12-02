@@ -453,8 +453,38 @@ exports.handlePaymentWebhook = asyncHandler(async (req, res) => {
  * PAYMENT ERROR HANDLER - MyFatoorah redirects here on error
  */
 exports.handlePaymentError = asyncHandler(async (req, res) => {
+  const { paymentId, Id } = req.query;
+  const paymentService = require('../services/payment.service');
+
   console.log(`[PaymentError] Payment error callback received`);
   console.log(`[PaymentError] Query params:`, req.query);
+
+  const actualPaymentId = paymentId || Id;
+
+  try {
+    // Get payment status from MyFatoorah to understand what went wrong
+    if (actualPaymentId) {
+      const paymentStatus = await paymentService.getPaymentStatus(actualPaymentId);
+      console.log(`[PaymentError] Payment status from MyFatoorah:`, JSON.stringify(paymentStatus, null, 2));
+
+      // Try to find and update the booking
+      if (paymentStatus.CustomerReference) {
+        const booking = await Booking.findById(paymentStatus.CustomerReference);
+        if (booking) {
+          booking.payment = {
+            ...booking.payment,
+            status: PAYMENT_STATUS.FAILED,
+            failedAt: new Date(),
+            gatewayResponse: paymentStatus
+          };
+          await booking.save();
+          console.log(`[PaymentError] ❌ Booking ${booking.bookingNumber} payment marked as failed`);
+        }
+      }
+    }
+  } catch (error) {
+    console.error(`[PaymentError] Error fetching payment status:`, error.message);
+  }
 
   // Redirect to frontend error page
   return res.redirect(
