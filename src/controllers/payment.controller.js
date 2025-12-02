@@ -203,7 +203,16 @@ exports.getPaymentDetails = asyncHandler(async (req, res) => {
   // Check authorization - user or driver only
   const driver = await Driver.findOne({ userId: req.userId });
   const isDriver = driver && booking.driverId && booking.driverId.toString() === driver._id.toString();
-  const isUser = booking.userId._id.toString() === req.userId;
+
+  // Handle both populated and non-populated userId
+  const bookingUserId = booking.userId._id ? booking.userId._id.toString() : booking.userId.toString();
+  const isUser = bookingUserId === req.userId;
+
+  console.log('[GetPaymentDetails] Authorization check:');
+  console.log('  - req.userId:', req.userId);
+  console.log('  - booking.userId:', bookingUserId);
+  console.log('  - isUser:', isUser);
+  console.log('  - isDriver:', isDriver);
 
   if (!isDriver && !isUser) {
     throw new ValidationError('You are not authorized to view this payment');
