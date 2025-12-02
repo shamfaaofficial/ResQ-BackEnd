@@ -60,7 +60,10 @@ const roleMiddleware = (...allowedRoles) => {
       throw new AuthenticationError('Not authenticated');
     }
 
+    console.log(`[RoleMiddleware] User role: ${req.user.role}, Allowed roles: ${allowedRoles.join(', ')}`);
+
     if (!allowedRoles.includes(req.user.role)) {
+      console.log(`[RoleMiddleware] ❌ Access denied for role: ${req.user.role}`);
       throw new AuthorizationError('Access denied. Insufficient permissions');
     }
 
