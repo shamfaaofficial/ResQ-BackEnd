@@ -1014,6 +1014,19 @@ exports.acceptBooking = asyncHandler(async (req, res) => {
 
   console.log('[AcceptBooking] Driver found:', driver._id);
 
+  // Check if booking exists and is not expired BEFORE accepting
+  const bookingCheck = await Booking.findById(bookingId);
+  if (!bookingCheck) {
+    console.log('[AcceptBooking] ❌ Booking does not exist');
+    throw new NotFoundError('Booking not found');
+  }
+
+  // Check if booking has expired
+  if (bookingCheck.isExpired()) {
+    console.log('[AcceptBooking] ❌ Booking request has expired');
+    throw new ValidationError('Booking request has expired');
+  }
+
   // Use findOneAndUpdate with atomic update to prevent race conditions
   let booking = await Booking.findOneAndUpdate(
     {
@@ -1065,15 +1078,6 @@ exports.acceptBooking = asyncHandler(async (req, res) => {
   }
 
   console.log('[AcceptBooking] ✅ Booking accepted successfully');
-
-  if (booking.isExpired()) {
-    // Revert the acceptance
-    booking.status = BOOKING_STATUS.REQUESTED;
-    booking.driverId = null;
-    booking.timeline.acceptedAt = null;
-    await booking.save();
-    throw new ValidationError('Booking request has expired');
-  }
 
   // Ensure booking has correct status and timeline (handles both new acceptance and recovery)
   if (booking.status === BOOKING_STATUS.REQUESTED) {
@@ -1440,43 +1444,6 @@ exports.completeTrip = asyncHandler(async (req, res) => {
 
   if (booking.status !== BOOKING_STATUS.IN_PROGRESS) {
     throw new ValidationError('Trip must be in progress to complete');
-  }
-
-  // SECURITY: Validate driver is near dropoff location before allowing completion
-  const { DROPOFF_PROXIMITY_THRESHOLD_METERS } = require('../config/constants');
-
-  if (actualDropoffLocation?.coordinates) {
-    // Validate driver's actual location is within acceptable range of planned dropoff
-    const distanceToDropoff = await mapsService.calculateDistance(
-      { lat: actualDropoffLocation.coordinates[1], lng: actualDropoffLocation.coordinates[0] },
-      { lat: booking.dropoffLocation.coordinates[1], lng: booking.dropoffLocation.coordinates[0] }
-    );
-
-    if (distanceToDropoff.distance > DROPOFF_PROXIMITY_THRESHOLD_METERS) {
-      throw new ValidationError(
-        `You must be within ${DROPOFF_PROXIMITY_THRESHOLD_METERS}m of the dropoff location to complete the trip. Current distance: ${Math.round(distanceToDropoff.distance)}m`
-      );
-    }
-
-    console.log(`[CompleteTrip] Location validated - Driver is ${Math.round(distanceToDropoff.distance)}m from dropoff location`);
-  } else {
-    // If no actual location provided, use driver's current location
-    if (!driver.currentLocation?.coordinates) {
-      throw new ValidationError('Driver location not available. Please enable location services.');
-    }
-
-    const distanceToDropoff = await mapsService.calculateDistance(
-      { lat: driver.currentLocation.coordinates[1], lng: driver.currentLocation.coordinates[0] },
-      { lat: booking.dropoffLocation.coordinates[1], lng: booking.dropoffLocation.coordinates[0] }
-    );
-
-    if (distanceToDropoff.distance > DROPOFF_PROXIMITY_THRESHOLD_METERS) {
-      throw new ValidationError(
-        `You must be within ${DROPOFF_PROXIMITY_THRESHOLD_METERS}m of the dropoff location to complete the trip. Current distance: ${Math.round(distanceToDropoff.distance)}m`
-      );
-    }
-
-    console.log(`[CompleteTrip] Location validated - Driver is ${Math.round(distanceToDropoff.distance)}m from dropoff location`);
   }
 
   // Update actual dropoff location if provided
