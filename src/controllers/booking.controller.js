@@ -1125,35 +1125,37 @@ exports.acceptBooking = asyncHandler(async (req, res) => {
   console.log('[AcceptBooking] Using driver name for notification:', driverName);
 
   try {
-    await notificationService.notifyBookingAccepted(
+    await notificationService.sendNotification(
       booking.userId._id,
-      booking._id,
-      driverName,
-      verificationCode
+      'Booking Accepted',
+      `${driverName} accepted your booking. Please complete payment to proceed.`,
+      'booking_accepted',
+      { bookingId: booking._id }
     );
-    console.log('[AcceptBooking] Booking acceptance notification sent to user with verification code');
+    console.log('[AcceptBooking] Booking acceptance notification sent to user');
   } catch (notifError) {
     console.error('[AcceptBooking] Failed to send notification to user:', notifError.message);
     // Don't fail the booking acceptance if notification fails
   }
 
-  // Emit Socket.IO event for real-time update
-  try {
-    emitBookingUpdate(booking);
-  } catch (error) {
-    console.error('[AcceptBooking] Failed to emit socket event:', error.message);
-  }
+  // IMPORTANT: DO NOT emit socket event with trip details until payment is completed
+  // Only notify that booking status changed to "accepted"
+  console.log('[AcceptBooking] ⚠️ NOT emitting full trip details - waiting for payment completion');
 
-  // Prepare response without dropoff location (hidden until trip starts)
-  const bookingResponse = booking.toObject();
-  delete bookingResponse.dropoffLocation;
+  // Prepare minimal response - NO trip details until payment completed
+  const minimalResponse = {
+    id: booking._id,
+    bookingNumber: booking.bookingNumber,
+    status: booking.status,
+    paymentExpiresAt: booking.paymentExpiresAt,
+    message: 'Booking accepted. Waiting for user to complete payment.'
+  };
 
   res.status(200).json({
     success: true,
-    message: 'Booking accepted and payment auto-completed (development mode)',
+    message: 'Booking accepted successfully. Waiting for payment.',
     data: {
-      booking: bookingResponse,
-      note: 'Payment auto-completed for testing. Driver can now navigate to pickup location.'
+      booking: minimalResponse
     }
   });
 });
@@ -1186,8 +1188,31 @@ exports.getDriverActiveBooking = asyncHandler(async (req, res) => {
     });
   }
 
-  // Hide dropoff location until trip starts (IN_PROGRESS status)
+  // IMPORTANT: If payment is NOT completed, return minimal details only
+  if (booking.status === BOOKING_STATUS.ACCEPTED && booking.payment?.status !== PAYMENT_STATUS.COMPLETED) {
+    console.log('[GetDriverActiveBooking] ⚠️ Payment NOT completed - returning minimal details');
+    const minimalResponse = {
+      id: booking._id,
+      bookingNumber: booking.bookingNumber,
+      status: booking.status,
+      paymentStatus: booking.payment?.status || PAYMENT_STATUS.PENDING,
+      paymentExpiresAt: booking.paymentExpiresAt,
+      message: 'Waiting for user to complete payment'
+    };
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        booking: minimalResponse
+      }
+    });
+  }
+
+  // Payment completed - return full trip details
+  console.log('[GetDriverActiveBooking] ✅ Payment completed - returning full trip details');
   const bookingResponse = booking.toObject();
+
+  // Hide dropoff location until trip starts (IN_PROGRESS status)
   if (booking.status !== BOOKING_STATUS.IN_PROGRESS && booking.status !== BOOKING_STATUS.COMPLETED) {
     delete bookingResponse.dropoffLocation;
   }

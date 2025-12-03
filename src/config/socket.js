@@ -686,6 +686,7 @@ const getIO = () => {
 
 /**
  * Emit booking status update to all parties
+ * IMPORTANT: Only sends minimal status updates, NOT full trip details
  */
 const emitBookingUpdate = (booking) => {
   if (!io) {
@@ -693,26 +694,34 @@ const emitBookingUpdate = (booking) => {
     return;
   }
 
+  // IMPORTANT: Only send status and timeline updates, NOT full trip details
+  // Full trip details should only be sent via 'trip:assigned' event after payment completion
   const update = {
     bookingId: booking._id,
     status: booking.status,
-    timeline: booking.timeline
+    timeline: booking.timeline,
+    paymentStatus: booking.payment?.status || 'pending'
   };
 
-  console.log(`\n📢 [Socket Emit] booking:status:update`);
+  console.log(`\n📢 [Socket Emit] booking:status:update (minimal info only)`);
   console.log(`   Booking ID: ${booking._id}`);
   console.log(`   New Status: ${booking.status}`);
+  console.log(`   Payment Status: ${update.paymentStatus}`);
   console.log(`   User ID: ${booking.userId}`);
   console.log(`   Driver ID: ${booking.driverId || 'Not assigned'}`);
 
-  // Emit to user
-  io.to(`user:${booking.userId}`).emit('booking:status:update', update);
+  // Emit to user (user should get full updates)
+  io.to(`user:${booking.userId}`).emit('booking:status:update', {
+    ...update,
+    bookingNumber: booking.bookingNumber
+  });
   console.log(`   ✅ Emitted to user room: user:${booking.userId}`);
 
-  // Emit to driver if assigned
+  // Emit to driver if assigned (minimal info only - no trip details)
   if (booking.driverId) {
     io.to(`driver:${booking.driverId}`).emit('booking:status:update', update);
     console.log(`   ✅ Emitted to driver room: driver:${booking.driverId}`);
+    console.log(`   ⚠️ NOTE: Driver should receive full trip details via 'trip:assigned' event after payment`);
   }
 
   // Emit to booking room

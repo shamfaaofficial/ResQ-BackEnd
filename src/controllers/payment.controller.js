@@ -92,21 +92,61 @@ exports.updatePaymentStatus = asyncHandler(async (req, res) => {
       description: `Payment for booking ${booking.bookingNumber}`
     });
 
-    // Notify driver that payment is completed
+    // Notify driver that payment is completed and send full trip details
     if (booking.driverId) {
-      const driver = await Driver.findById(booking.driverId).populate('userId', 'fcmToken');
-      if (driver && driver.userId?.fcmToken) {
-        await notificationService.sendNotification(
-          driver.userId._id,
-          'Payment Received',
-          `Payment of ${booking.pricing.totalAmount} ${booking.pricing.currency} received for booking ${booking.bookingNumber}. You can now proceed to pickup location.`,
-          'payment_completed',
-          { bookingId: booking._id }
-        );
+      const driver = await Driver.findById(booking.driverId).populate('userId', 'fcmToken phoneNumber profile');
+      if (driver) {
+        // Send notification
+        if (driver.userId?.fcmToken) {
+          await notificationService.sendNotification(
+            driver.userId._id,
+            'Payment Received',
+            `Payment of ${booking.pricing.totalAmount} ${booking.pricing.currency} received for booking ${booking.bookingNumber}. You can now proceed to pickup location.`,
+            'payment_completed',
+            { bookingId: booking._id }
+          );
+        }
+
+        // IMPORTANT: NOW send full trip details via socket to driver
+        console.log('[PaymentUpdate] 🚨 Payment completed - sending full trip details to driver');
+
+        // Populate full booking details for driver
+        await booking.populate('userId', 'phoneNumber profile');
+
+        // Send complete trip assignment to driver via socket
+        const { emitToDriver } = require('../services/socket.service');
+
+        const tripDetails = {
+          bookingId: booking._id.toString(),
+          bookingNumber: booking.bookingNumber,
+          status: booking.status,
+          pickupLocation: booking.pickupLocation,
+          dropoffLocation: booking.dropoffLocation,
+          vehicleType: booking.vehicleType,
+          vehicleDetails: booking.vehicleDetails,
+          pricing: booking.pricing,
+          distance: booking.distance,
+          estimatedDuration: booking.estimatedDuration,
+          timeline: booking.timeline,
+          paymentStatus: booking.payment.status,
+          user: {
+            id: booking.userId._id.toString(),
+            phoneNumber: booking.userId.phoneNumber,
+            name: booking.userId.profile?.firstName
+              ? `${booking.userId.profile.firstName} ${booking.userId.profile.lastName || ''}`.trim()
+              : 'User',
+            profileImage: booking.userId.profile?.profileImage
+          },
+          createdAt: booking.createdAt,
+          timestamp: new Date().toISOString()
+        };
+
+        emitToDriver(driver._id.toString(), 'trip:assigned', tripDetails);
+        console.log('[PaymentUpdate] ✅ Full trip details sent to driver via socket');
       }
     }
 
-    // Emit Socket.IO event for real-time update
+    // Emit booking update to user as well
     try {
       emitBookingUpdate(booking);
     } catch (error) {
@@ -450,15 +490,66 @@ exports.handlePaymentWebhook = asyncHandler(async (req, res) => {
 
         console.log(`[PaymentWebhook] ✅ Payment webhook processed for booking ${booking.bookingNumber}`);
 
-        // Notify driver
+        // Notify driver and send full trip details
         if (booking.driverId) {
-          await notificationService.sendNotification(
-            booking.driverId,
-            'Payment Received',
-            `Payment completed for booking ${booking.bookingNumber}`,
-            'payment_completed',
-            { bookingId: booking._id }
-          );
+          const driver = await Driver.findById(booking.driverId).populate('userId', 'fcmToken phoneNumber profile');
+          if (driver) {
+            // Send notification
+            if (driver.userId) {
+              await notificationService.sendNotification(
+                driver.userId._id,
+                'Payment Received',
+                `Payment completed for booking ${booking.bookingNumber}. You can now proceed to pickup location.`,
+                'payment_completed',
+                { bookingId: booking._id }
+              );
+            }
+
+            // IMPORTANT: Send full trip details via socket to driver
+            console.log('[PaymentWebhook] 🚨 Payment completed via webhook - sending full trip details to driver');
+
+            // Populate user details
+            await booking.populate('userId', 'phoneNumber profile');
+
+            // Send complete trip assignment to driver via socket
+            const { emitToDriver } = require('../services/socket.service');
+
+            const tripDetails = {
+              bookingId: booking._id.toString(),
+              bookingNumber: booking.bookingNumber,
+              status: booking.status,
+              pickupLocation: booking.pickupLocation,
+              dropoffLocation: booking.dropoffLocation,
+              vehicleType: booking.vehicleType,
+              vehicleDetails: booking.vehicleDetails,
+              pricing: booking.pricing,
+              distance: booking.distance,
+              estimatedDuration: booking.estimatedDuration,
+              timeline: booking.timeline,
+              paymentStatus: booking.payment.status,
+              verificationCode: booking.verificationCode?.code || null,
+              user: {
+                id: booking.userId._id.toString(),
+                phoneNumber: booking.userId.phoneNumber,
+                name: booking.userId.profile?.firstName
+                  ? `${booking.userId.profile.firstName} ${booking.userId.profile.lastName || ''}`.trim()
+                  : 'User',
+                profileImage: booking.userId.profile?.profileImage
+              },
+              createdAt: booking.createdAt,
+              timestamp: new Date().toISOString()
+            };
+
+            emitToDriver(driver._id.toString(), 'trip:assigned', tripDetails);
+            console.log('[PaymentWebhook] ✅ Full trip details sent to driver via socket');
+          }
+        }
+
+        // Emit booking update to user as well
+        try {
+          emitBookingUpdate(booking);
+        } catch (error) {
+          console.error('[PaymentWebhook] Failed to emit booking update:', error.message);
         }
       }
 
