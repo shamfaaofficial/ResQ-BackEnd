@@ -361,7 +361,7 @@ exports.getUserActiveBooking = asyncHandler(async (req, res) => {
   }
   console.log('========== END GET USER ACTIVE BOOKING ==========\n');
 
-  // If booking exists with driver, fetch real-time driver location
+  // If booking exists with driver, fetch real-time driver location and generate signed URL for profile image
   let driverCurrentLocation = null;
   if (booking && booking.driverId) {
     const driver = await Driver.findById(booking.driverId._id).select('currentLocation');
@@ -372,6 +372,22 @@ exports.getUserActiveBooking = asyncHandler(async (req, res) => {
         address: driver.currentLocation.address,
         lastUpdated: driver.currentLocation.lastUpdated
       };
+    }
+
+    // Generate signed URL for driver profile image if it's an S3 URL
+    if (booking.driverId.userId?.profile?.profileImage) {
+      const profileImageUrl = booking.driverId.userId.profile.profileImage;
+      if (profileImageUrl.includes('s3.') && profileImageUrl.includes('amazonaws.com')) {
+        try {
+          const { getSignedFileUrl, extractS3Key } = require('../config/s3');
+          const s3Key = extractS3Key(profileImageUrl);
+          const signedUrl = await getSignedFileUrl(s3Key, 3600); // 1 hour expiry
+          booking.driverId.userId.profile.profileImage = signedUrl;
+          console.log(`[GetUserActiveBooking] Generated signed URL for driver profile image`);
+        } catch (error) {
+          console.error(`[GetUserActiveBooking] Failed to generate signed URL:`, error.message);
+        }
+      }
     }
   }
 
@@ -504,6 +520,21 @@ exports.getBookingLiveStatus = asyncHandler(async (req, res) => {
     }
   }
 
+  // Generate signed URL for driver profile image if it's an S3 URL
+  let driverProfileImage = driver.userId?.profile?.profileImage;
+  if (driverProfileImage && driverProfileImage.includes('s3.') && driverProfileImage.includes('amazonaws.com')) {
+    try {
+      const { getSignedFileUrl, extractS3Key } = require('../config/s3');
+      const s3Key = extractS3Key(driverProfileImage);
+      const signedUrl = await getSignedFileUrl(s3Key, 3600); // 1 hour expiry
+      driverProfileImage = signedUrl;
+      console.log(`[GetBookingLiveStatus] Generated signed URL for driver profile image`);
+    } catch (error) {
+      console.error(`[GetBookingLiveStatus] Failed to generate signed URL:`, error.message);
+      // Keep original URL if signing fails
+    }
+  }
+
   // Prepare driver info
   const driverInfo = {
     id: driver._id,
@@ -511,7 +542,7 @@ exports.getBookingLiveStatus = asyncHandler(async (req, res) => {
       ? `${driver.userId.profile.firstName} ${driver.userId.profile.lastName}`
       : 'Driver',
     phoneNumber: driver.userId?.phoneNumber,
-    profileImage: driver.userId?.profile?.profileImage,
+    profileImage: driverProfileImage,
     currentLocation: driverLocation,
     vehicleDetails: {
       vehicleType: driver.vehicleDetails?.vehicleType,
@@ -780,17 +811,52 @@ exports.getUserBookingHistory = asyncHandler(async (req, res) => {
   }
 
   const bookings = await Booking.find(query)
-    .populate('driverId', 'userId vehicleDetails rating')
+    .populate({
+      path: 'driverId',
+      select: 'userId vehicleDetails rating',
+      populate: {
+        path: 'userId',
+        select: 'phoneNumber profile'
+      }
+    })
     .sort({ createdAt: -1 })
     .limit(parseInt(limit))
-    .skip((parseInt(page) - 1) * parseInt(limit));
+    .skip((parseInt(page) - 1) * parseInt(limit))
+    .lean();
 
   const total = await Booking.countDocuments(query);
+
+  // Generate signed URLs for profile images
+  const { getSignedFileUrl, extractS3Key } = require('../config/s3');
+
+  const bookingsWithSignedUrls = await Promise.all(
+    bookings.map(async (booking) => {
+      // If driver has profile image stored in S3, generate signed URL
+      if (booking.driverId?.userId?.profile?.profileImage) {
+        const profileImageUrl = booking.driverId.userId.profile.profileImage;
+
+        // Check if it's an S3 URL that needs signing
+        if (profileImageUrl.includes('s3.') && profileImageUrl.includes('amazonaws.com')) {
+          try {
+            const s3Key = extractS3Key(profileImageUrl);
+            const signedUrl = await getSignedFileUrl(s3Key, 3600); // 1 hour expiry
+            booking.driverId.userId.profile.profileImage = signedUrl;
+            console.log(`[BookingHistory] Generated signed URL for driver profile image`);
+          } catch (error) {
+            console.error(`[BookingHistory] Failed to generate signed URL for profile image:`, error.message);
+            // Keep original URL if signing fails
+          }
+        }
+      }
+
+      return booking;
+    })
+  );
 
   res.status(200).json({
     success: true,
     data: {
-      bookings,
+      bookings: bookingsWithSignedUrls,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -1974,14 +2040,42 @@ exports.getDriverBookingHistory = asyncHandler(async (req, res) => {
     .populate('userId', 'phoneNumber profile')
     .sort({ createdAt: -1 })
     .limit(parseInt(limit))
-    .skip((parseInt(page) - 1) * parseInt(limit));
+    .skip((parseInt(page) - 1) * parseInt(limit))
+    .lean();
 
   const total = await Booking.countDocuments(query);
+
+  // Generate signed URLs for user profile images
+  const { getSignedFileUrl, extractS3Key } = require('../config/s3');
+
+  const bookingsWithSignedUrls = await Promise.all(
+    bookings.map(async (booking) => {
+      // If user has profile image stored in S3, generate signed URL
+      if (booking.userId?.profile?.profileImage) {
+        const profileImageUrl = booking.userId.profile.profileImage;
+
+        // Check if it's an S3 URL that needs signing
+        if (profileImageUrl.includes('s3.') && profileImageUrl.includes('amazonaws.com')) {
+          try {
+            const s3Key = extractS3Key(profileImageUrl);
+            const signedUrl = await getSignedFileUrl(s3Key, 3600); // 1 hour expiry
+            booking.userId.profile.profileImage = signedUrl;
+            console.log(`[DriverBookingHistory] Generated signed URL for user profile image`);
+          } catch (error) {
+            console.error(`[DriverBookingHistory] Failed to generate signed URL for profile image:`, error.message);
+            // Keep original URL if signing fails
+          }
+        }
+      }
+
+      return booking;
+    })
+  );
 
   res.status(200).json({
     success: true,
     data: {
-      bookings,
+      bookings: bookingsWithSignedUrls,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),

@@ -34,9 +34,18 @@ exports.rateDriver = asyncHandler(async (req, res) => {
   }
 
   // Verify booking belongs to user
-  if (booking.userId._id.toString() !== req.userId) {
+  // Handle both populated and non-populated userId
+  const bookingUserId = booking.userId._id ? booking.userId._id.toString() : booking.userId.toString();
+  const requestUserId = req.userId.toString();
+
+  console.log(`[RateDriver] Comparing bookingUserId: ${bookingUserId} with requestUserId: ${requestUserId}`);
+
+  if (bookingUserId !== requestUserId) {
+    console.log(`[RateDriver] ❌ Authorization failed - user mismatch`);
     throw new AuthorizationError('You can only rate your own bookings');
   }
+
+  console.log(`[RateDriver] ✅ Authorization passed - user owns this booking`);
 
   // Verify booking is completed
   if (booking.status !== BOOKING_STATUS.COMPLETED) {
