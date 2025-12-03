@@ -366,6 +366,19 @@ exports.getRideHistory = asyncHandler(async (req, res) => {
     Booking.countDocuments(query)
   ]);
 
+  // CRITICAL: Filter out driver details for bookings where payment is not completed
+  const { PAYMENT_STATUS } = require('../config/constants');
+  const filteredBookings = bookings.map(booking => {
+    if (booking.payment?.status !== PAYMENT_STATUS.COMPLETED) {
+      // Remove driver details if payment not completed
+      return {
+        ...booking,
+        driverId: null
+      };
+    }
+    return booking;
+  });
+
   // Calculate statistics
   const mongoose = require('mongoose');
   const stats = await Booking.aggregate([
@@ -401,7 +414,7 @@ exports.getRideHistory = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
     data: {
-      rides: bookings,
+      rides: filteredBookings,
       pagination: {
         currentPage: pageNum,
         totalPages: Math.ceil(totalCount / limitNum),

@@ -361,12 +361,14 @@ exports.getUserActiveBooking = asyncHandler(async (req, res) => {
   }
   console.log('========== END GET USER ACTIVE BOOKING ==========\n');
 
-  // IMPORTANT: If booking is ACCEPTED but payment is NOT completed, return minimal details only
-  // This prevents users from seeing trip details after initiating payment but pressing back button
+  // IMPORTANT: If payment is NOT completed, return minimal details only
+  // This prevents users from seeing trip details before payment regardless of booking status
   const { PAYMENT_STATUS } = require('../config/constants');
 
-  if (booking && booking.status === BOOKING_STATUS.ACCEPTED && booking.payment?.status !== PAYMENT_STATUS.COMPLETED) {
+  if (booking && booking.payment?.status !== PAYMENT_STATUS.COMPLETED) {
     console.log('[GetUserActiveBooking] ⚠️ Payment NOT completed - returning minimal details for user');
+    console.log('[GetUserActiveBooking] Current booking status:', booking.status);
+    console.log('[GetUserActiveBooking] Current payment status:', booking.payment?.status);
 
     const minimalResponse = {
       id: booking._id,
@@ -456,6 +458,10 @@ exports.getBookingStatus = asyncHandler(async (req, res) => {
   console.log('[GetBookingStatus] Payment status from DB:', booking.payment.status);
   console.log('[GetBookingStatus] Full payment object:', JSON.stringify(booking.payment, null, 2));
 
+  // CRITICAL: Only return driver details if payment is completed
+  const { PAYMENT_STATUS } = require('../config/constants');
+  const isPaymentCompleted = booking.payment?.status === PAYMENT_STATUS.COMPLETED;
+
   const responseData = {
     success: true,
     data: {
@@ -470,17 +476,20 @@ exports.getBookingStatus = asyncHandler(async (req, res) => {
         failedAt: booking.payment.failedAt
       },
       cancellationDetails: booking.cancellationDetails || null,
-      driver: booking.driverId ? {
+      // Only return driver details if payment is completed
+      driver: (isPaymentCompleted && booking.driverId) ? {
         id: booking.driverId._id,
         name: booking.driverId.userId?.profile?.firstName || 'Driver',
         phoneNumber: booking.driverId.userId?.phoneNumber
       } : null,
       timeline: booking.timeline,
-      pricing: booking.pricing
+      pricing: booking.pricing,
+      needsPayment: !isPaymentCompleted
     }
   };
 
   console.log('[GetBookingStatus] Response payment status:', responseData.data.payment.status);
+  console.log('[GetBookingStatus] Driver details included:', !!responseData.data.driver);
 
   res.status(200).json(responseData);
 });
@@ -517,12 +526,14 @@ exports.getBookingLiveStatus = asyncHandler(async (req, res) => {
     });
   }
 
-  // IMPORTANT: If booking is ACCEPTED but payment is NOT completed, return minimal details
-  // This prevents users from seeing trip details after initiating payment but pressing back button
+  // IMPORTANT: If payment is NOT completed, return minimal details
+  // This prevents users from seeing trip details before payment regardless of booking status
   const { PAYMENT_STATUS } = require('../config/constants');
 
-  if (booking.status === BOOKING_STATUS.ACCEPTED && booking.payment?.status !== PAYMENT_STATUS.COMPLETED) {
+  if (booking.payment?.status !== PAYMENT_STATUS.COMPLETED) {
     console.log('[GetBookingLiveStatus] ⚠️ Payment NOT completed - returning minimal details');
+    console.log('[GetBookingLiveStatus] Current booking status:', booking.status);
+    console.log('[GetBookingLiveStatus] Current payment status:', booking.payment?.status);
 
     return res.status(200).json({
       success: true,
@@ -888,11 +899,22 @@ exports.getUserBookingHistory = asyncHandler(async (req, res) => {
 
   const total = await Booking.countDocuments(query);
 
+  // CRITICAL: Filter out driver details for bookings where payment is not completed
+  const { PAYMENT_STATUS } = require('../config/constants');
+
   // Generate signed URLs for profile images
   const { getSignedFileUrl, extractS3Key } = require('../config/s3');
 
   const bookingsWithSignedUrls = await Promise.all(
     bookings.map(async (booking) => {
+      // CRITICAL: Remove driver details if payment not completed
+      if (booking.payment?.status !== PAYMENT_STATUS.COMPLETED) {
+        return {
+          ...booking,
+          driverId: null
+        };
+      }
+
       // If driver has profile image stored in S3, generate signed URL
       if (booking.driverId?.userId?.profile?.profileImage) {
         const profileImageUrl = booking.driverId.userId.profile.profileImage;
