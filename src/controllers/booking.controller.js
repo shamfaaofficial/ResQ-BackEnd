@@ -361,6 +361,37 @@ exports.getUserActiveBooking = asyncHandler(async (req, res) => {
   }
   console.log('========== END GET USER ACTIVE BOOKING ==========\n');
 
+  // IMPORTANT: If booking is ACCEPTED but payment is NOT completed, return minimal details only
+  // This prevents users from seeing trip details after initiating payment but pressing back button
+  const { PAYMENT_STATUS } = require('../config/constants');
+
+  if (booking && booking.status === BOOKING_STATUS.ACCEPTED && booking.payment?.status !== PAYMENT_STATUS.COMPLETED) {
+    console.log('[GetUserActiveBooking] ⚠️ Payment NOT completed - returning minimal details for user');
+
+    const minimalResponse = {
+      id: booking._id,
+      bookingNumber: booking.bookingNumber,
+      status: booking.status,
+      paymentStatus: booking.payment?.status || PAYMENT_STATUS.PENDING,
+      paymentUrl: booking.payment?.paymentUrl || null,
+      paymentExpiresAt: booking.paymentExpiresAt,
+      pricing: booking.pricing, // Include pricing so user knows what to pay
+      message: 'Please complete payment to view trip details',
+      needsPayment: true
+    };
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        booking: minimalResponse,
+        driverCurrentLocation: null
+      }
+    });
+  }
+
+  // Payment completed - return full trip details
+  console.log('[GetUserActiveBooking] ✅ Payment completed or trip in progress - returning full details');
+
   // If booking exists with driver, fetch real-time driver location and generate signed URL for profile image
   let driverCurrentLocation = null;
   if (booking && booking.driverId) {
@@ -485,6 +516,37 @@ exports.getBookingLiveStatus = asyncHandler(async (req, res) => {
       }
     });
   }
+
+  // IMPORTANT: If booking is ACCEPTED but payment is NOT completed, return minimal details
+  // This prevents users from seeing trip details after initiating payment but pressing back button
+  const { PAYMENT_STATUS } = require('../config/constants');
+
+  if (booking.status === BOOKING_STATUS.ACCEPTED && booking.payment?.status !== PAYMENT_STATUS.COMPLETED) {
+    console.log('[GetBookingLiveStatus] ⚠️ Payment NOT completed - returning minimal details');
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        booking: {
+          id: booking._id,
+          bookingNumber: booking.bookingNumber,
+          status: booking.status,
+          paymentStatus: booking.payment?.status || PAYMENT_STATUS.PENDING,
+          paymentUrl: booking.payment?.paymentUrl || null,
+          paymentExpiresAt: booking.paymentExpiresAt,
+          pricing: booking.pricing,
+          message: 'Please complete payment to view trip details',
+          needsPayment: true
+        },
+        driver: null,
+        eta: null,
+        distanceToPickup: null
+      }
+    });
+  }
+
+  // Payment completed - proceed with full details
+  console.log('[GetBookingLiveStatus] ✅ Payment completed - returning full trip details');
 
   // Get driver details
   const driver = await Driver.findById(booking.driverId);
