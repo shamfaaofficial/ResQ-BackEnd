@@ -5,7 +5,7 @@ const { getRedisClient, isRedisAvailable } = require('../config/redis');
 // General API rate limiter
 const generalLimiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 1000, // Increased to 1000
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 10000, // Increased to 10000 for development
   message: {
     success: false,
     error: {
@@ -25,7 +25,7 @@ const generalLimiter = rateLimit({
 // Strict limiter for auth endpoints
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 requests per window
+  max: 100, // Increased to 100 for development
   message: {
     success: false,
     error: {
@@ -43,7 +43,7 @@ const authLimiter = rateLimit({
 // OTP request limiter
 const otpLimiter = rateLimit({
   windowMs: 5 * 60 * 1000, // 5 minutes
-  max: 3, // 3 OTP requests per window
+  max: 50, // Increased to 50 for development
   message: {
     success: false,
     error: {
@@ -62,7 +62,7 @@ const otpLimiter = rateLimit({
 // Payment limiter
 const paymentLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 5,
+  max: 100, // Increased to 100 for development
   message: {
     success: false,
     error: {
@@ -76,10 +76,10 @@ const paymentLimiter = rateLimit({
   }
 });
 
-// Location update limiter - 60 requests per minute (every second allowed)
+// Location update limiter - 600 requests per minute for development
 const locationUpdateLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 60, // 60 updates per minute (every second allowed)
+  max: 600, // Increased to 600 for development
   message: {
     success: false,
     error: {
