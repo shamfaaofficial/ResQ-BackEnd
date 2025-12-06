@@ -322,6 +322,52 @@ exports.toggleOnlineStatus = asyncHandler(async (req, res) => {
   });
 });
 
+// Update driver profile (personal information)
+exports.updateProfile = asyncHandler(async (req, res) => {
+  const { firstName, lastName, email } = req.body;
+
+  // Get user
+  const user = await User.findById(req.userId);
+  if (!user) {
+    throw new NotFoundError('User not found');
+  }
+
+  // Get driver profile
+  const driver = await Driver.findOne({ userId: req.userId });
+  if (!driver) {
+    throw new NotFoundError('Driver profile not found');
+  }
+
+  // Update user profile fields
+  if (firstName !== undefined) {
+    user.profile.firstName = firstName;
+  }
+  if (lastName !== undefined) {
+    user.profile.lastName = lastName;
+  }
+  if (email !== undefined) {
+    // Validate email format if provided
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new ValidationError('Invalid email format');
+    }
+    user.profile.email = email;
+  }
+
+  await user.save();
+
+  // Return updated profile with driver details
+  const updatedDriver = await Driver.findOne({ userId: req.userId })
+    .populate('userId', 'phoneNumber profile role isActive');
+
+  res.status(200).json({
+    success: true,
+    message: 'Profile updated successfully',
+    data: {
+      driver: updatedDriver
+    }
+  });
+});
+
 // Update vehicle details
 exports.updateVehicleDetails = asyncHandler(async (req, res) => {
   const {

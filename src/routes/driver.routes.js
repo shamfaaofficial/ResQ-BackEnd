@@ -36,6 +36,14 @@ router.get(
   driverController.getDriverProfile
 );
 
+// Update driver profile (personal information)
+router.patch(
+  '/profile',
+  authMiddleware,
+  roleMiddleware('driver'),
+  driverController.updateProfile
+);
+
 // Upload/Update profile picture
 router.post(
   '/profile-picture',
