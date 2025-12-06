@@ -104,8 +104,13 @@ if (process.env.NODE_ENV === 'development') {
   app.use(morgan('combined'));
 }
 
-// Rate limiting
-app.use('/api', generalLimiter);
+// Rate limiting (disabled in development for testing)
+if (process.env.NODE_ENV === 'production') {
+  app.use('/api', generalLimiter);
+  console.log('✅ Rate limiting ENABLED (production mode)');
+} else {
+  console.log('⚠️  Rate limiting DISABLED (development mode)');
+}
 
 // Block suspicious paths (security)
 app.use((req, res, next) => {
