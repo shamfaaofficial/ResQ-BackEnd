@@ -361,31 +361,19 @@ exports.getUserActiveBooking = asyncHandler(async (req, res) => {
   }
   console.log('========== END GET USER ACTIVE BOOKING ==========\n');
 
-  // IMPORTANT: If payment is NOT completed, return minimal details only
-  // This prevents users from seeing trip details before payment regardless of booking status
+  // IMPORTANT: If payment is NOT completed, treat as NO active trip
+  // Return null for booking - user should not see any active trip data until payment is completed
   const { PAYMENT_STATUS } = require('../config/constants');
 
   if (booking && booking.payment?.status !== PAYMENT_STATUS.COMPLETED) {
-    console.log('[GetUserActiveBooking] ⚠️ Payment NOT completed - returning minimal details for user');
+    console.log('[GetUserActiveBooking] ⚠️ Payment NOT completed - returning NO active trip (null)');
     console.log('[GetUserActiveBooking] Current booking status:', booking.status);
     console.log('[GetUserActiveBooking] Current payment status:', booking.payment?.status);
-
-    const minimalResponse = {
-      id: booking._id,
-      bookingNumber: booking.bookingNumber,
-      status: booking.status,
-      paymentStatus: booking.payment?.status || PAYMENT_STATUS.PENDING,
-      paymentUrl: booking.payment?.paymentUrl || null,
-      paymentExpiresAt: booking.paymentExpiresAt,
-      pricing: booking.pricing, // Include pricing so user knows what to pay
-      message: 'Please complete payment to view trip details',
-      needsPayment: true
-    };
 
     return res.status(200).json({
       success: true,
       data: {
-        booking: minimalResponse,
+        booking: null,
         driverCurrentLocation: null
       }
     });
@@ -1338,22 +1326,17 @@ exports.getDriverActiveBooking = asyncHandler(async (req, res) => {
     });
   }
 
-  // IMPORTANT: If payment is NOT completed, return minimal details only
+  // IMPORTANT: If payment is NOT completed, treat as NO active trip
+  // Return null for booking - driver should not see any active trip data until payment is completed
   if (booking.status === BOOKING_STATUS.ACCEPTED && booking.payment?.status !== PAYMENT_STATUS.COMPLETED) {
-    console.log('[GetDriverActiveBooking] ⚠️ Payment NOT completed - returning minimal details');
-    const minimalResponse = {
-      id: booking._id,
-      bookingNumber: booking.bookingNumber,
-      status: booking.status,
-      paymentStatus: booking.payment?.status || PAYMENT_STATUS.PENDING,
-      paymentExpiresAt: booking.paymentExpiresAt,
-      message: 'Waiting for user to complete payment'
-    };
+    console.log('[GetDriverActiveBooking] ⚠️ Payment NOT completed - returning NO active trip (null)');
+    console.log('[GetDriverActiveBooking] Current booking status:', booking.status);
+    console.log('[GetDriverActiveBooking] Current payment status:', booking.payment?.status);
 
     return res.status(200).json({
       success: true,
       data: {
-        booking: minimalResponse
+        booking: null
       }
     });
   }
