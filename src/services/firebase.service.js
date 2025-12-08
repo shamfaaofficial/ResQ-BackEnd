@@ -7,6 +7,12 @@ class FirebaseService {
    * Send push notification to a single device
    */
   async sendPushNotification(fcmToken, title, body, data = {}, dataOnly = false) {
+    console.log(`[FirebaseService] 📤 sendPushNotification called`);
+    console.log(`[FirebaseService] FCM Token (first 20 chars): ${fcmToken ? fcmToken.substring(0, 20) + '...' : 'NONE'}`);
+    console.log(`[FirebaseService] Title: "${title}"`);
+    console.log(`[FirebaseService] Body: "${body}"`);
+    console.log(`[FirebaseService] Data-only mode: ${dataOnly}`);
+
     if (!firebaseConfig.isInitialized()) {
       console.warn('⚠️  Firebase not initialized. Skipping push notification.');
       return { success: false, error: 'Firebase not initialized' };
@@ -62,12 +68,15 @@ class FirebaseService {
         };
       }
 
+      console.log(`[FirebaseService] 🚀 Sending FCM message...`);
       const response = await messaging.send(message);
-      console.log('✅ Push notification sent successfully:', response);
+      console.log('✅ Push notification sent successfully. Message ID:', response);
 
       return { success: true, messageId: response };
     } catch (error) {
       console.error('❌ Failed to send push notification:', error.message);
+      console.error('❌ Error code:', error.code);
+      console.error('❌ Full error:', error);
 
       // Handle invalid or expired tokens
       if (error.code === 'messaging/invalid-registration-token' ||
@@ -84,6 +93,7 @@ class FirebaseService {
    */
   async sendPushToDriver(driverId, title, body, data = {}, dataOnly = false) {
     try {
+      console.log(`[FirebaseService] 🔍 Fetching driver ${driverId} to send push notification...`);
       const driver = await Driver.findById(driverId).populate('userId', 'fcmToken');
 
       if (!driver) {
@@ -91,12 +101,23 @@ class FirebaseService {
         return { success: false, error: 'Driver not found' };
       }
 
+      console.log(`[FirebaseService] Driver found. Checking FCM token...`);
+      console.log(`[FirebaseService] driver.fcmToken:`, driver.fcmToken || 'NOT SET');
+      console.log(`[FirebaseService] driver.userId.fcmToken:`, driver.userId?.fcmToken || 'NOT SET');
+
       const fcmToken = driver.fcmToken || driver.userId?.fcmToken;
 
       if (!fcmToken) {
         console.warn('⚠️  Driver has no FCM token:', driverId);
+        console.warn('⚠️  Driver must set FCM token to receive push notifications');
         return { success: false, error: 'No FCM token for driver' };
       }
+
+      console.log(`[FirebaseService] ✅ FCM token found, sending notification...`);
+      console.log(`[FirebaseService] Title: "${title}"`);
+      console.log(`[FirebaseService] Body: "${body}"`);
+      console.log(`[FirebaseService] Data:`, data);
+      console.log(`[FirebaseService] Data-only mode:`, dataOnly);
 
       return await this.sendPushNotification(fcmToken, title, body, {
         ...data,
@@ -105,6 +126,7 @@ class FirebaseService {
       }, dataOnly);
     } catch (error) {
       console.error('❌ Failed to send push to driver:', error.message);
+      console.error('❌ Stack:', error.stack);
       return { success: false, error: error.message };
     }
   }

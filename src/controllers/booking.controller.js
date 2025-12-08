@@ -2324,6 +2324,17 @@ exports.requestSpecificDriver = asyncHandler(async (req, res) => {
 
   // Send notification to driver via Firebase (non-blocking - don't fail on notification error)
   try {
+    console.log('[RequestDriver] 🔔 Attempting to send FCM notification to driver...');
+    console.log('[RequestDriver] Driver ID:', driver._id);
+    console.log('[RequestDriver] Driver FCM Token:', driver.fcmToken || driver.userId?.fcmToken || 'NO TOKEN');
+    console.log('[RequestDriver] Booking ID:', booking._id);
+    console.log('[RequestDriver] Pickup Address:', pickupLocation.address || 'Pickup location');
+    console.log('[RequestDriver] Additional Data:', {
+      eta: driverToPickup.duration,
+      pricing: totalAmount,
+      bookingNumber: booking.bookingNumber
+    });
+
     await notificationService.notifyDriverNewBooking(
       driver._id,
       booking._id,
@@ -2334,9 +2345,10 @@ exports.requestSpecificDriver = asyncHandler(async (req, res) => {
         bookingNumber: booking.bookingNumber
       }
     );
-    console.log('[RequestDriver] Notification sent to driver successfully');
+    console.log('[RequestDriver] ✅ FCM notification sent to driver successfully');
   } catch (notificationError) {
-    console.error('[RequestDriver] Failed to send notification to driver:', notificationError.message);
+    console.error('[RequestDriver] ❌ Failed to send FCM notification to driver:', notificationError.message);
+    console.error('[RequestDriver] ❌ Full error:', notificationError);
     // Don't fail the request if notification fails
   }
 
