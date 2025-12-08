@@ -377,6 +377,18 @@ exports.getUserActiveBooking = asyncHandler(async (req, res) => {
       paymentStatus: booking.payment?.status || PAYMENT_STATUS.PENDING,
       paymentUrl: booking.payment?.paymentUrl || null,
       paymentExpiresAt: booking.paymentExpiresAt,
+      pickupLocation: {
+        latitude: booking.pickupLocation.coordinates[1],
+        longitude: booking.pickupLocation.coordinates[0],
+        address: booking.pickupLocation.address,
+        placeName: booking.pickupLocation.placeName
+      },
+      dropoffLocation: {
+        latitude: booking.dropoffLocation.coordinates[1],
+        longitude: booking.dropoffLocation.coordinates[0],
+        address: booking.dropoffLocation.address,
+        placeName: booking.dropoffLocation.placeName
+      },
       pricing: booking.pricing, // Include pricing so user knows what to pay
       message: 'Please complete payment to view trip details',
       needsPayment: true
@@ -424,10 +436,27 @@ exports.getUserActiveBooking = asyncHandler(async (req, res) => {
     }
   }
 
+  // Transform booking to ensure consistent location format with address
+  const formattedBooking = booking ? {
+    ...booking.toObject(),
+    pickupLocation: {
+      latitude: booking.pickupLocation.coordinates[1],
+      longitude: booking.pickupLocation.coordinates[0],
+      address: booking.pickupLocation.address,
+      placeName: booking.pickupLocation.placeName
+    },
+    dropoffLocation: {
+      latitude: booking.dropoffLocation.coordinates[1],
+      longitude: booking.dropoffLocation.coordinates[0],
+      address: booking.dropoffLocation.address,
+      placeName: booking.dropoffLocation.placeName
+    }
+  } : null;
+
   res.status(200).json({
     success: true,
     data: {
-      booking: booking || null,
+      booking: formattedBooking,
       driverCurrentLocation: driverCurrentLocation  // Real-time driver location
     }
   });
