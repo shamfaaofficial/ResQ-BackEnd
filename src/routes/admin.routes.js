@@ -5,6 +5,8 @@ const adminDriverController = require('../controllers/admin.driver.controller');
 const adminTripController = require('../controllers/admin.trip.controller');
 const adminDashboardController = require('../controllers/admin.dashboard.controller');
 const adminDocumentController = require('../controllers/admin.document.controller');
+const adminSettingsController = require('../controllers/admin.settings.controller');
+const adminWithdrawalController = require('../controllers/admin.withdrawal.controller');
 const { authMiddleware, roleMiddleware } = require('../middlewares/auth');
 
 // All admin routes require authentication and admin role
@@ -122,5 +124,52 @@ router.patch('/trips/:tripId/cancel', adminTripController.cancelTrip);
 
 // Update trip status (force update)
 router.patch('/trips/:tripId/status', adminTripController.updateTripStatus);
+
+/**
+ * SETTINGS MANAGEMENT ROUTES
+ */
+
+// Get all settings
+router.get('/settings', adminSettingsController.getAllSettings);
+
+// Get driver commission percentage
+router.get('/settings/commission', adminSettingsController.getDriverCommission);
+
+// Update driver commission percentage
+router.put('/settings/commission', adminSettingsController.updateDriverCommission);
+
+// Get specific setting by key
+router.get('/settings/:settingKey', adminSettingsController.getSettingByKey);
+
+// Update or create a setting
+router.put('/settings/:settingKey', adminSettingsController.updateSetting);
+
+// Delete a setting
+router.delete('/settings/:settingKey', adminSettingsController.deleteSetting);
+
+/**
+ * WITHDRAWAL MANAGEMENT ROUTES
+ */
+
+// Get all withdrawals
+router.get('/withdrawals', adminWithdrawalController.getAllWithdrawals);
+
+// Get pending withdrawals
+router.get('/withdrawals/pending', adminWithdrawalController.getPendingWithdrawals);
+
+// Get withdrawal statistics
+router.get('/withdrawals/statistics', adminWithdrawalController.getWithdrawalStats);
+
+// Get withdrawal by ID
+router.get('/withdrawals/:withdrawalId', adminWithdrawalController.getWithdrawalById);
+
+// Approve withdrawal (move to processing)
+router.patch('/withdrawals/:withdrawalId/approve', adminWithdrawalController.approveWithdrawal);
+
+// Reject withdrawal
+router.patch('/withdrawals/:withdrawalId/reject', adminWithdrawalController.rejectWithdrawal);
+
+// Mark withdrawal as completed
+router.patch('/withdrawals/:withdrawalId/complete', adminWithdrawalController.completeWithdrawal);
 
 module.exports = router;

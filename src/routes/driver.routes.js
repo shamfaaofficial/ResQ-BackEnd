@@ -3,6 +3,7 @@ const router = express.Router();
 const driverController = require('../controllers/driver.controller');
 const authController = require('../controllers/auth.controller');
 const driverDocumentController = require('../controllers/driver.document.controller');
+const driverWithdrawalController = require('../controllers/driver.withdrawal.controller');
 const ratingController = require('../controllers/rating.controller');
 const { authMiddleware, roleMiddleware } = require('../middlewares/auth');
 const { locationUpdateLimiter } = require('../middlewares/rateLimiter');
@@ -189,6 +190,58 @@ router.delete(
   authMiddleware,
   roleMiddleware('driver'),
   driverDocumentController.deleteDocument
+);
+
+/**
+ * WALLET & WITHDRAWAL ROUTES
+ */
+
+// Get wallet balance
+router.get(
+  '/wallet',
+  authMiddleware,
+  roleMiddleware('driver'),
+  driverWithdrawalController.getWalletBalance
+);
+
+// Request withdrawal
+router.post(
+  '/withdrawals',
+  authMiddleware,
+  roleMiddleware('driver'),
+  driverWithdrawalController.requestWithdrawal
+);
+
+// Get withdrawal history
+router.get(
+  '/withdrawals',
+  authMiddleware,
+  roleMiddleware('driver'),
+  driverWithdrawalController.getWithdrawalHistory
+);
+
+// Get pending withdrawals
+router.get(
+  '/withdrawals/pending',
+  authMiddleware,
+  roleMiddleware('driver'),
+  driverWithdrawalController.getPendingWithdrawals
+);
+
+// Get withdrawal by ID
+router.get(
+  '/withdrawals/:withdrawalId',
+  authMiddleware,
+  roleMiddleware('driver'),
+  driverWithdrawalController.getWithdrawalById
+);
+
+// Cancel withdrawal request
+router.delete(
+  '/withdrawals/:withdrawalId',
+  authMiddleware,
+  roleMiddleware('driver'),
+  driverWithdrawalController.cancelWithdrawal
 );
 
 module.exports = router;

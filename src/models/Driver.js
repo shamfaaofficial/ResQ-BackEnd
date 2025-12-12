@@ -189,6 +189,16 @@ const driverSchema = new mongoose.Schema({
       default: 0
     }
   },
+  wallet: {
+    balance: {
+      type: Number,
+      default: 0
+    },
+    pendingAmount: {
+      type: Number,
+      default: 0
+    }
+  },
   bankDetails: {
     accountHolderName: String,
     bankName: String,

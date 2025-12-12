@@ -284,6 +284,24 @@ exports.getPaymentDetails = asyncHandler(async (req, res) => {
 });
 
 /**
+ * INITIATE PAYMENT FROM BODY - Accepts bookingId in request body
+ * Wrapper function that forwards to initiatePayment
+ */
+exports.initiatePaymentFromBody = asyncHandler(async (req, res) => {
+  const { bookingId } = req.body;
+
+  if (!bookingId) {
+    throw new ValidationError('bookingId is required in request body');
+  }
+
+  console.log(`[InitiatePaymentFromBody] User ${req.userId} initiating payment for booking ${bookingId}`);
+
+  // Forward to the main initiatePayment logic by setting params
+  req.params.bookingId = bookingId;
+  return exports.initiatePayment(req, res);
+});
+
+/**
  * INITIATE PAYMENT - Generate MyFatoorah payment URL
  * User calls this to get payment link after driver accepts
  */

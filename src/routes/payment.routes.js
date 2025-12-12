@@ -7,7 +7,15 @@ const { authMiddleware, roleMiddleware } = require('../middlewares/auth');
  * PAYMENT INITIATION (User starts payment process)
  */
 
-// Initiate payment - Get MyFatoorah payment URL (protected - user only)
+// Initiate payment with bookingId in body (protected - user only)
+router.post(
+  '/initiate',
+  authMiddleware,
+  roleMiddleware('user'),
+  paymentController.initiatePaymentFromBody
+);
+
+// Initiate payment with bookingId in URL (protected - user only)
 router.post(
   '/initiate/:bookingId',
   authMiddleware,

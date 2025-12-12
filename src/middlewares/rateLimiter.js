@@ -3,9 +3,11 @@ const RedisStore = require('rate-limit-redis');
 const { getRedisClient, isRedisAvailable } = require('../config/redis');
 
 // General API rate limiter
+// IMPORTANT: This is per IP address, not per user
+// Set very high limit to avoid blocking legitimate traffic from shared IPs (NAT, proxies, etc.)
 const generalLimiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 10000, // Increased to 10000 for development
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 10000, // Very high limit (10k requests per 15 min per IP)
   message: {
     success: false,
     error: {
@@ -15,11 +17,18 @@ const generalLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  // Trust X-Forwarded-For header (Vercel proxy)
+  // Use Redis store if available (for multi-server support and distributed rate limiting)
+  store: isRedisAvailable() ? new RedisStore({
+    sendCommand: (...args) => getRedisClient().sendCommand(args),
+    prefix: 'ratelimit:general:'
+  }) : undefined,
+  // Trust X-Forwarded-For header (for Vercel/proxy deployments)
   validate: {
     xForwardedForHeader: false,
     trustProxy: true
-  }
+  },
+  // Skip failed requests (only count successful requests)
+  skipFailedRequests: true
 });
 
 // Strict limiter for auth endpoints

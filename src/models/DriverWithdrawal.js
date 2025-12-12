@@ -13,6 +13,22 @@ const driverWithdrawalSchema = new mongoose.Schema({
     required: true,
     min: 10
   },
+  deductionAmount: {
+    type: Number,
+    default: 0
+  },
+  deductionPercentage: {
+    type: Number,
+    default: 5
+  },
+  finalAmount: {
+    type: Number,
+    required: true
+  },
+  isAutomatic: {
+    type: Boolean,
+    default: false
+  },
   status: {
     type: String,
     enum: Object.values(WITHDRAWAL_STATUS),

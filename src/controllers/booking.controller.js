@@ -1666,22 +1666,70 @@ exports.completeTrip = asyncHandler(async (req, res) => {
     booking.distance.actual = actualDistanceData.distance / 1000;
   }
 
-  // Calculate driver earnings and platform commission
-  const pricing = await PricingConfig.findOne({ vehicleType: booking.vehicleType });
-  const commissionPercentage = pricing?.driverCommissionPercentage || 20;
+  // Get admin-configurable driver commission percentage (default 25%)
+  const AdminSettings = require('../models/AdminSettings');
+  const Transaction = require('../models/Transaction');
 
-  booking.platformCommission = (booking.pricing.totalAmount * commissionPercentage) / 100;
-  booking.driverEarnings = booking.pricing.totalAmount - booking.platformCommission;
+  let driverCommissionPercentage = 25; // Default 25%
 
+  try {
+    const commissionSetting = await AdminSettings.findOne({ settingKey: 'driver_commission_percentage' });
+    if (commissionSetting && commissionSetting.settingValue) {
+      driverCommissionPercentage = parseFloat(commissionSetting.settingValue);
+      console.log(`[CompleteTrip] Using admin-configured driver commission: ${driverCommissionPercentage}%`);
+    } else {
+      console.log(`[CompleteTrip] No admin setting found, using default commission: ${driverCommissionPercentage}%`);
+    }
+  } catch (error) {
+    console.error('[CompleteTrip] Failed to fetch admin commission setting:', error.message);
+    console.log(`[CompleteTrip] Falling back to default commission: ${driverCommissionPercentage}%`);
+  }
+
+  // Calculate driver earnings based on commission percentage
+  const totalAmount = booking.pricing.totalAmount;
+  const driverEarnings = (totalAmount * driverCommissionPercentage) / 100;
+  const platformCommission = totalAmount - driverEarnings;
+
+  booking.platformCommission = Math.round(platformCommission * 100) / 100;
+  booking.driverEarnings = Math.round(driverEarnings * 100) / 100;
   booking.status = BOOKING_STATUS.COMPLETED;
   booking.timeline.completedAt = new Date();
   await booking.save();
 
-  // Update driver earnings
+  console.log(`[CompleteTrip] Trip completed - Total: ${totalAmount} QAR, Driver gets: ${booking.driverEarnings} QAR (${driverCommissionPercentage}%), Platform: ${booking.platformCommission} QAR`);
+
+  // Credit driver's wallet with earnings
+  if (!driver.wallet) {
+    driver.wallet = { balance: 0, pendingAmount: 0 };
+  }
+  driver.wallet.balance += booking.driverEarnings;
+
+  // Also update legacy earnings field for backward compatibility
   driver.earnings.totalEarnings += booking.driverEarnings;
   driver.earnings.availableBalance += booking.driverEarnings;
   driver.isBusy = false; // Driver is now available
   await driver.save();
+
+  console.log(`[CompleteTrip] Driver wallet credited - New balance: ${driver.wallet.balance} QAR`);
+
+  // Create transaction record for driver earnings
+  try {
+    const { TRANSACTION_TYPE } = require('../config/constants');
+    await Transaction.create({
+      driverId: driver._id,
+      userId: booking.userId,
+      bookingId: booking._id,
+      type: TRANSACTION_TYPE.DRIVER_EARNING,
+      amount: booking.driverEarnings,
+      currency: booking.pricing.currency || 'QAR',
+      status: 'completed',
+      description: `Earnings from trip ${booking.bookingNumber} (${driverCommissionPercentage}% commission)`
+    });
+    console.log(`[CompleteTrip] Transaction record created for driver earnings`);
+  } catch (txError) {
+    console.error('[CompleteTrip] Failed to create transaction record:', txError.message);
+    // Don't fail trip completion if transaction record fails
+  }
 
   // Populate user and driver details for notifications
   await booking.populate('userId', 'phoneNumber profile fcmToken');

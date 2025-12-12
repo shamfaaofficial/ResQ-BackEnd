@@ -255,6 +255,9 @@ const startServer = async () => {
 
     // Start background jobs
     require('./jobs/booking.job');
+    const { scheduleAutomaticWithdrawals, scheduleAutoCompleteJob } = require('./jobs/withdrawal.job');
+    scheduleAutomaticWithdrawals();
+    scheduleAutoCompleteJob();
 
     // Start HTTP server
     const http = require('http');

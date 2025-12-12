@@ -63,8 +63,9 @@ module.exports = {
   WITHDRAWAL_STATUS: {
     PENDING: 'pending',
     APPROVED: 'approved',
-    REJECTED: 'rejected',
-    PROCESSED: 'processed'
+    PROCESSING: 'processing',
+    COMPLETED: 'completed',
+    REJECTED: 'rejected'
   },
 
   NOTIFICATION_TYPE: {
