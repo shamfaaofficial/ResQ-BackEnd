@@ -1,73 +1,71 @@
 const express = require('express');
 const router = express.Router();
 const bookingController = require('../controllers/booking.controller');
-const { authMiddleware, roleMiddleware } = require('../middlewares/auth');
+const { authMiddleware, roleMiddleware, optionalAuth } = require('../middlewares/auth');
 
 /**
  * USER BOOKING ROUTES
  */
 
-// Get nearby drivers (protected - user only)
+// Get nearby drivers (public - no auth required, guests can browse)
 router.get(
   '/nearby-drivers',
-  authMiddleware,
-  roleMiddleware('user'),
+  optionalAuth,
   bookingController.getNearbyDrivers
 );
 
-// Get price estimate (protected - user only)
+// Get price estimate (public - no auth required, guests can browse)
 router.get(
   '/price-estimate',
-  authMiddleware,
-  roleMiddleware('user'),
+  optionalAuth,
   bookingController.getPriceEstimate
 );
 
-// Create booking (protected - user only)
+// Create booking (protected - user or guest)
 router.post(
   '/',
   authMiddleware,
-  roleMiddleware('user'),
+  roleMiddleware('user', 'guest'),
   bookingController.createBooking
 );
 
-// Get user's active booking (protected - user only)
+// Get user's active booking (protected - user or guest)
 router.get(
   '/user/active',
   authMiddleware,
-  roleMiddleware('user'),
+  roleMiddleware('user', 'guest'),
   bookingController.getUserActiveBooking
 );
 
-// Get booking status by ID including payment info (protected - user only)
+// Get booking status by ID including payment info (protected - user or guest)
 router.get(
   '/user/:bookingId/status',
   authMiddleware,
-  roleMiddleware('user'),
+  roleMiddleware('user', 'guest'),
   bookingController.getBookingStatus
 );
 
-// Get live booking status with driver location and ETA (protected - user only)
+// Get live booking status with driver location and ETA (protected - user or guest)
 router.get(
   '/user/:bookingId/live-status',
   authMiddleware,
-  roleMiddleware('user'),
+  roleMiddleware('user', 'guest'),
   bookingController.getBookingLiveStatus
 );
 
-// Get calculated price for booking after driver arrives (protected - user only)
+// Get calculated price for booking after driver arrives (protected - user or guest)
 router.get(
   '/user/:bookingId/price',
   authMiddleware,
-  roleMiddleware('user'),
+  roleMiddleware('user', 'guest'),
   bookingController.getBookingPrice
 );
 
-// Cancel booking (protected - user only)
+// Cancel booking (protected - user or guest)
 router.patch(
   '/user/:bookingId/cancel',
   authMiddleware,
-  roleMiddleware('user'),
+  roleMiddleware('user', 'guest'),
   bookingController.cancelBooking
 );
 

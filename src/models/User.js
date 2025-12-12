@@ -22,13 +22,21 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: true,
+    required: false, // Not required for guest users
     select: false
   },
   role: {
     type: String,
     enum: Object.values(ROLES),
     required: true
+  },
+  isGuest: {
+    type: Boolean,
+    default: false
+  },
+  guestCreatedAt: {
+    type: Date,
+    default: null
   },
   isVerified: {
     type: Boolean,
@@ -41,7 +49,7 @@ const userSchema = new mongoose.Schema({
   profile: {
     firstName: {
       type: String,
-      required: false,
+      required: false, // Not required for guest users
       trim: true
     },
     lastName: {
@@ -98,7 +106,7 @@ userSchema.index({ phoneNumber: 1, role: 1 });
 // username already has unique index from schema definition
 
 // Method to clean expired refresh tokens
-userSchema.methods.cleanExpiredTokens = function() {
+userSchema.methods.cleanExpiredTokens = function () {
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   this.refreshTokens = this.refreshTokens.filter(
     rt => rt.createdAt > sevenDaysAgo
@@ -106,7 +114,7 @@ userSchema.methods.cleanExpiredTokens = function() {
 };
 
 // Virtual for full name
-userSchema.virtual('fullName').get(function() {
+userSchema.virtual('fullName').get(function () {
   return `${this.profile.firstName} ${this.profile.lastName}`;
 });
 

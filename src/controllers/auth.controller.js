@@ -289,6 +289,33 @@ exports.userRefreshToken = asyncHandler(async (req, res) => {
 });
 
 /**
+ * GUEST USER AUTHENTICATION
+ * Anonymous browsing - no phone/OTP required
+ */
+
+// Create anonymous guest session (for browsing only)
+exports.createGuestSession = asyncHandler(async (req, res) => {
+  // Generate a unique identifier for this anonymous guest session
+  const crypto = require('crypto');
+  const sessionId = crypto.randomUUID();
+
+  // Generate anonymous guest token (24 hours expiry - shorter since it's anonymous)
+  const { generateGuestAccessToken } = require('../utils/helpers');
+  const accessToken = generateGuestAccessToken(sessionId, 'anonymous');
+
+  res.status(200).json({
+    success: true,
+    message: 'Guest session created successfully',
+    data: {
+      sessionId,
+      accessToken,
+      expiresIn: '24 hours',
+      note: 'This is a browsing-only session. Sign up to create bookings.'
+    }
+  });
+});
+
+/**
  * DRIVER AUTHENTICATION
  */
 

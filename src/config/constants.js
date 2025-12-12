@@ -2,7 +2,8 @@ module.exports = {
   ROLES: {
     USER: 'user',
     DRIVER: 'driver',
-    ADMIN: 'admin'
+    ADMIN: 'admin',
+    GUEST: 'guest'
   },
 
   VEHICLE_TYPES: {
@@ -83,6 +84,7 @@ module.exports = {
   OTP_MAX_ATTEMPTS: 3,
   BOOKING_REQUEST_TIMEOUT_SECONDS: 20,
   PAYMENT_TIMEOUT_SECONDS: 300,
+  GUEST_TOKEN_EXPIRY_HOURS: 72, // 3 days for guest sessions
 
   // Location validation thresholds (in meters)
   DROPOFF_PROXIMITY_THRESHOLD_METERS: 20000, // Driver must be within 500m of dropoff to complete trip

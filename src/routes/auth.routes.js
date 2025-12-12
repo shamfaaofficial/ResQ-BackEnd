@@ -29,6 +29,9 @@ router.post('/user/complete-signup', authController.userCompleteSignup);
 router.post('/user/login', authController.userLogin);
 router.post('/user/refresh-token', authController.userRefreshToken);
 
+// Guest Authentication Routes (Anonymous browsing)
+router.post('/guest/session', authController.createGuestSession); // Create anonymous guest session (no auth required)
+
 // Driver Authentication Routes
 router.post('/driver/signup', authController.driverSignup);
 router.post('/driver/verify-otp', authController.driverVerifyOTP);

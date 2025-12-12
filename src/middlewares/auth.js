@@ -93,6 +93,7 @@ const checkDriverApproval = asyncHandler(async (req, res, next) => {
 
 /**
  * Optional auth - attach user if token exists but don't fail if not
+ * Supports both regular users and anonymous guest sessions
  */
 const optionalAuth = asyncHandler(async (req, res, next) => {
   let token;
@@ -104,12 +105,20 @@ const optionalAuth = asyncHandler(async (req, res, next) => {
   if (token) {
     try {
       const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
-      const user = await User.findById(decoded.userId).select('-password');
 
-      if (user && user.isActive) {
-        req.user = user;
-        req.userId = user._id;
-        req.userRole = user.role;
+      // Check if it's an anonymous guest session
+      if (decoded.isAnonymous && decoded.role === 'guest') {
+        req.isAnonymousGuest = true;
+        req.guestSessionId = decoded.sessionId;
+        req.userRole = 'guest';
+      } else {
+        // Regular user authentication
+        const user = await User.findById(decoded.userId).select('-password');
+        if (user && user.isActive) {
+          req.user = user;
+          req.userId = user._id;
+          req.userRole = user.role;
+        }
       }
     } catch (error) {
       // Silently fail for optional auth

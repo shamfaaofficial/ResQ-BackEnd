@@ -221,6 +221,25 @@ const calculateDriverEarnings = (totalAmount, platformCommissionPercentage) => {
 };
 
 /**
+ * Generate JWT access token for anonymous guest sessions (browsing only)
+ */
+const generateGuestAccessToken = (sessionId, identifier) => {
+  // 24 hours for anonymous browsing (no user data, shorter expiry)
+  return jwt.sign(
+    { sessionId, role: 'guest', identifier, isAnonymous: true },
+    process.env.JWT_ACCESS_SECRET,
+    { expiresIn: '24h' }
+  );
+};
+
+/**
+ * Check if user is a guest
+ */
+const isGuestUser = (user) => {
+  return user && user.isGuest === true && user.role === 'guest';
+};
+
+/**
  * Clean phone number - remove invisible Unicode characters
  */
 const cleanPhoneNumber = (phoneNumber) => {
@@ -234,6 +253,7 @@ module.exports = {
   comparePassword,
   generateAccessToken,
   generateRefreshToken,
+  generateGuestAccessToken,
   verifyToken,
   generateOTP,
   hashOTP,
@@ -247,5 +267,6 @@ module.exports = {
   sanitizeQuery,
   calculateTripPrice,
   calculateDriverEarnings,
-  cleanPhoneNumber
+  cleanPhoneNumber,
+  isGuestUser
 };
