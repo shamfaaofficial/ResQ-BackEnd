@@ -33,6 +33,19 @@ exports.requestWithdrawal = asyncHandler(async (req, res) => {
     throw new ValidationError(`Minimum withdrawal amount is ${minimumWithdrawal} QAR`);
   }
 
+  // SYNC: Check if wallet balance is out of sync with legacy availableBalance
+  // (Fix for drivers who existed before wallet feature or have data inconsistencies)
+  if (driver.earnings && driver.earnings.availableBalance > (driver.wallet?.balance || 0)) {
+    console.log(`[WithdrawalRequest] Syncing wallet balance from earnings.availableBalance`);
+    console.log(`[WithdrawalRequest] Wallet: ${driver.wallet?.balance}, Earnings.Available: ${driver.earnings.availableBalance}`);
+
+    if (!driver.wallet) {
+      driver.wallet = { balance: 0, pendingAmount: 0 };
+    }
+    driver.wallet.balance = driver.earnings.availableBalance;
+    // We don't save yet, we'll save after deduction
+  }
+
   // Check if driver has sufficient balance
   const currentBalance = driver.wallet?.balance || 0;
   if (amount > currentBalance) {
@@ -87,6 +100,12 @@ exports.requestWithdrawal = asyncHandler(async (req, res) => {
   }
   driver.wallet.balance -= amount;
   driver.wallet.pendingAmount = (driver.wallet.pendingAmount || 0) + amount;
+
+  // CRITICAL: Also decrement legacy availableBalance to keep it in sync and prevent double-spending
+  if (driver.earnings) {
+    driver.earnings.availableBalance = Math.max(0, (driver.earnings.availableBalance || 0) - amount);
+  }
+
   await driver.save();
 
   console.log('[WithdrawalRequest] ✅ Withdrawal request created');
