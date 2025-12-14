@@ -191,7 +191,8 @@ const calculateTripPrice = (distance, pricingConfig) => {
   const serviceFeePercentage = pricingConfig.serviceFeePercentage || 0;
 
   const distancePrice = distance * perKmRate;
-  const subtotal = basePrice + distancePrice;
+  // Use max of basePrice or distancePrice (basePrice is minimum charge)
+  const subtotal = Math.max(basePrice, distancePrice);
   const serviceFee = (subtotal * serviceFeePercentage) / 100;
   const totalAmount = subtotal + serviceFee;
 

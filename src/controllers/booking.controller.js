@@ -173,11 +173,12 @@ exports.getPriceEstimate = asyncHandler(async (req, res) => {
 
   const distanceInKm = distanceData.distance / 1000;
 
-  // Static pricing: 110 QAR base + 10 QAR per km
+  // Pricing: 10 QAR per km, with minimum of 110 QAR
   const basePrice = 110;
   const perKmRate = 10;
   const distancePrice = distanceInKm * perKmRate;
-  const totalAmount = basePrice + distancePrice;
+  // Use max of basePrice or distancePrice (minimum charge is 110 QAR)
+  const totalAmount = Math.max(basePrice, distancePrice);
 
   res.status(200).json({
     success: true,
@@ -192,7 +193,7 @@ exports.getPriceEstimate = asyncHandler(async (req, res) => {
         totalAmount: Math.round(totalAmount * 100) / 100,
         currency: 'QAR',
         breakdown: {
-          base: `${basePrice} QAR (fixed)`,
+          base: `${basePrice} QAR (minimum)`,
           distance: `${Math.round(distanceInKm * 10) / 10} km × ${perKmRate} QAR/km = ${Math.round(distancePrice * 100) / 100} QAR`,
           total: `${Math.round(totalAmount * 100) / 100} QAR`
         }
@@ -241,11 +242,12 @@ exports.createBooking = asyncHandler(async (req, res) => {
 
   const distanceInKm = distanceData.distance / 1000;
 
-  // Static pricing: 110 QAR base + 10 QAR per km
+  // Pricing: 10 QAR per km, with minimum of 110 QAR
   const basePrice = 110;
   const perKmRate = 10;
   const distancePrice = distanceInKm * perKmRate;
-  const totalAmount = basePrice + distancePrice;
+  // Use max of basePrice or distancePrice (minimum charge is 110 QAR)
+  const totalAmount = Math.max(basePrice, distancePrice);
 
   // Generate booking number
   const bookingNumber = `BK${Date.now()}${Math.floor(Math.random() * 1000)}`;
@@ -2311,11 +2313,12 @@ exports.requestSpecificDriver = asyncHandler(async (req, res) => {
     throw new ValidationError(`Failed to calculate trip route: ${error.message}`);
   }
 
-  // Calculate pricing: 110 QAR base + 10 QAR per km
+  // Calculate pricing: 10 QAR per km, with minimum of 110 QAR
   const basePrice = 110;
   const perKmRate = 10;
   const distancePrice = tripRoute.distance * perKmRate;
-  const totalAmount = basePrice + distancePrice;
+  // Use max of basePrice or distancePrice (minimum charge is 110 QAR)
+  const totalAmount = Math.max(basePrice, distancePrice);
 
   // Generate booking number
   const bookingNumber = `BK${Date.now()}${Math.floor(Math.random() * 1000)}`;
