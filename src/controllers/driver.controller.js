@@ -38,7 +38,20 @@ exports.getDriverProfile = asyncHandler(async (req, res) => {
 
   res.status(200).json({
     success: true,
-    data: { driver: driverData }
+    data: {
+      driver: driverData,
+      // Simplified rating object for easy frontend access
+      rating: {
+        average: driver.rating?.average || 0,
+        totalRatings: driver.rating?.totalRatings || 0,
+        categories: {
+          professionalism: driver.rating?.professionalism || 0,
+          serviceQuality: driver.rating?.serviceQuality || 0,
+          timeliness: driver.rating?.timeliness || 0,
+          vehicleHandling: driver.rating?.vehicleHandling || 0
+        }
+      }
+    }
   });
 });
 
