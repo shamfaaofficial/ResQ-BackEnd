@@ -573,12 +573,12 @@ async function updateDriverRatingStats(driverId) {
 
   // Update driver
   await Driver.findByIdAndUpdate(driverId, {
-    'rating.average': (totalOverall / ratings.length).toFixed(2),
+    'rating.average': parseFloat((totalOverall / ratings.length).toFixed(2)),
     'rating.totalRatings': ratings.length,
-    'rating.professionalism': profCount > 0 ? (totalProfessionalism / profCount).toFixed(2) : 0,
-    'rating.serviceQuality': serviceCount > 0 ? (totalServiceQuality / serviceCount).toFixed(2) : 0,
-    'rating.timeliness': timeCount > 0 ? (totalTimeliness / timeCount).toFixed(2) : 0,
-    'rating.vehicleHandling': vehicleCount > 0 ? (totalVehicleHandling / vehicleCount).toFixed(2) : 0,
+    'rating.professionalism': profCount > 0 ? parseFloat((totalProfessionalism / profCount).toFixed(2)) : 0,
+    'rating.serviceQuality': serviceCount > 0 ? parseFloat((totalServiceQuality / serviceCount).toFixed(2)) : 0,
+    'rating.timeliness': timeCount > 0 ? parseFloat((totalTimeliness / timeCount).toFixed(2)) : 0,
+    'rating.vehicleHandling': vehicleCount > 0 ? parseFloat((totalVehicleHandling / vehicleCount).toFixed(2)) : 0,
     'rating.fiveStars': starDistribution[5],
     'rating.fourStars': starDistribution[4],
     'rating.threeStars': starDistribution[3],

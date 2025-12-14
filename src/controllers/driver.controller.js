@@ -40,15 +40,18 @@ exports.getDriverProfile = asyncHandler(async (req, res) => {
     success: true,
     data: {
       driver: driverData,
-      // Simplified rating object for easy frontend access
+      // Single rating variable for easy display
+      finalRating: Math.round((driver.rating?.average || 0) * 10) / 10, // e.g., 4.6 out of 5
+      totalRatings: driver.rating?.totalRatings || 0,
+      // Detailed breakdown (optional)
       rating: {
-        average: driver.rating?.average || 0,
+        average: Math.round((driver.rating?.average || 0) * 10) / 10,
         totalRatings: driver.rating?.totalRatings || 0,
         categories: {
-          professionalism: driver.rating?.professionalism || 0,
-          serviceQuality: driver.rating?.serviceQuality || 0,
-          timeliness: driver.rating?.timeliness || 0,
-          vehicleHandling: driver.rating?.vehicleHandling || 0
+          professionalism: Math.round((driver.rating?.professionalism || 0) * 10) / 10,
+          serviceQuality: Math.round((driver.rating?.serviceQuality || 0) * 10) / 10,
+          timeliness: Math.round((driver.rating?.timeliness || 0) * 10) / 10,
+          vehicleHandling: Math.round((driver.rating?.vehicleHandling || 0) * 10) / 10
         }
       }
     }
