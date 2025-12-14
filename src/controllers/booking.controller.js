@@ -179,6 +179,8 @@ exports.getPriceEstimate = asyncHandler(async (req, res) => {
   const distancePrice = distanceInKm * perKmRate;
   // Use max of basePrice or distancePrice (minimum charge is 110 QAR)
   const totalAmount = Math.max(basePrice, distancePrice);
+  // Set basePrice to 0 in response if distance charge covers it
+  const responsiveBasePrice = distancePrice >= basePrice ? 0 : basePrice;
 
   res.status(200).json({
     success: true,
@@ -187,13 +189,13 @@ exports.getPriceEstimate = asyncHandler(async (req, res) => {
       distance: Math.round(distanceInKm * 10) / 10,
       estimatedDuration: Math.round(distanceData.duration / 60), // in minutes
       pricing: {
-        basePrice: basePrice,
+        basePrice: responsiveBasePrice,
         perKmRate: perKmRate,
         distancePrice: Math.round(distancePrice * 100) / 100,
         totalAmount: Math.round(totalAmount * 100) / 100,
         currency: 'QAR',
         breakdown: {
-          base: `${basePrice} QAR (minimum)`,
+          base: responsiveBasePrice > 0 ? `${responsiveBasePrice} QAR (minimum charge)` : 'Not applied',
           distance: `${Math.round(distanceInKm * 10) / 10} km × ${perKmRate} QAR/km = ${Math.round(distancePrice * 100) / 100} QAR`,
           total: `${Math.round(totalAmount * 100) / 100} QAR`
         }
@@ -276,7 +278,7 @@ exports.createBooking = asyncHandler(async (req, res) => {
       estimated: distanceInKm
     },
     pricing: {
-      basePrice: basePrice,
+      basePrice: responsiveBasePrice,
       perKmRate: perKmRate,
       totalDistance: distanceInKm,
       distancePrice: Math.round(distancePrice * 100) / 100,
@@ -2319,6 +2321,8 @@ exports.requestSpecificDriver = asyncHandler(async (req, res) => {
   const distancePrice = tripRoute.distance * perKmRate;
   // Use max of basePrice or distancePrice (minimum charge is 110 QAR)
   const totalAmount = Math.max(basePrice, distancePrice);
+  // Set basePrice to 0 if distance charge covers it
+  const responsiveBasePrice = distancePrice >= basePrice ? 0 : basePrice;
 
   // Generate booking number
   const bookingNumber = `BK${Date.now()}${Math.floor(Math.random() * 1000)}`;
@@ -2350,7 +2354,7 @@ exports.requestSpecificDriver = asyncHandler(async (req, res) => {
       driverToPickup: driverToPickup.distance
     },
     pricing: {
-      basePrice: basePrice,
+      basePrice: responsiveBasePrice,
       perKmRate: perKmRate,
       totalDistance: tripRoute.distance,
       distancePrice: Math.round(distancePrice * 100) / 100,

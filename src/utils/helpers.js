@@ -195,9 +195,11 @@ const calculateTripPrice = (distance, pricingConfig) => {
   const subtotal = Math.max(basePrice, distancePrice);
   const serviceFee = (subtotal * serviceFeePercentage) / 100;
   const totalAmount = subtotal + serviceFee;
+  // Set basePrice to 0 in response if distance charge covers it
+  const responsiveBasePrice = distancePrice >= basePrice ? 0 : basePrice;
 
   return {
-    basePrice,
+    basePrice: responsiveBasePrice,
     perKmRate,
     totalDistance: distance,
     distancePrice: parseFloat(distancePrice.toFixed(2)),
