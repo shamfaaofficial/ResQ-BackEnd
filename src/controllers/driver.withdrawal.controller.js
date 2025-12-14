@@ -89,7 +89,10 @@ exports.requestWithdrawal = asyncHandler(async (req, res) => {
       accountHolderName: withdrawalBankDetails.accountHolderName,
       bankName: withdrawalBankDetails.bankName,
       accountNumber: withdrawalBankDetails.accountNumber,
-      iban: withdrawalBankDetails.iban
+      iban: withdrawalBankDetails.iban,
+      swiftCode: withdrawalBankDetails.swiftCode,
+      bankAddress: withdrawalBankDetails.bankAddress,
+      bankCity: withdrawalBankDetails.bankCity
     },
     requestedAt: new Date()
   });

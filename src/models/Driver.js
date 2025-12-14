@@ -203,7 +203,10 @@ const driverSchema = new mongoose.Schema({
     accountHolderName: String,
     bankName: String,
     accountNumber: String,
-    iban: String
+    iban: String,
+    swiftCode: String,
+    bankAddress: String,
+    bankCity: String
   },
   isLocationEnabled: {
     type: Boolean,

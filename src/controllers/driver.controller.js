@@ -431,6 +431,9 @@ exports.updateBankDetails = asyncHandler(async (req, res) => {
   if (bankName) driver.bankDetails.bankName = bankName;
   if (accountNumber) driver.bankDetails.accountNumber = accountNumber;
   if (iban) driver.bankDetails.iban = iban;
+  if (req.body.swiftCode) driver.bankDetails.swiftCode = req.body.swiftCode;
+  if (req.body.bankAddress) driver.bankDetails.bankAddress = req.body.bankAddress;
+  if (req.body.bankCity) driver.bankDetails.bankCity = req.body.bankCity;
 
   await driver.save();
 
