@@ -89,28 +89,40 @@ async function createAutomaticWithdrawals() {
 }
 
 /**
- * Auto-complete withdrawals that have been in 'processing' status for more than 2 days
- * without admin marking them as completed
+ * Auto-complete withdrawals that have been pending for more than 2 days
+ * Handles both PENDING and PROCESSING status withdrawals
+ * Excludes REJECTED withdrawals
  */
 async function autoCompleteStaleWithdrawals() {
   try {
     console.log('\n========== AUTO-COMPLETE STALE WITHDRAWALS ==========');
     console.log(`[AutoComplete] Running at: ${new Date().toISOString()}`);
 
-    // Find withdrawals in 'processing' status for more than 2 days
+    // Find withdrawals in 'pending' or 'processing' status for more than 2 days
     const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
 
     const staleWithdrawals = await DriverWithdrawal.find({
-      status: WITHDRAWAL_STATUS.PROCESSING,
-      processedAt: { $lte: twoDaysAgo }
+      status: { $in: [WITHDRAWAL_STATUS.PENDING, WITHDRAWAL_STATUS.PROCESSING] },
+      requestedAt: { $lte: twoDaysAgo }
     });
 
     console.log(`[AutoComplete] Found ${staleWithdrawals.length} stale withdrawals to auto-complete`);
 
+    let completedCount = 0;
+    let errorCount = 0;
+
     for (const withdrawal of staleWithdrawals) {
       try {
+        const previousStatus = withdrawal.status;
         withdrawal.status = WITHDRAWAL_STATUS.COMPLETED;
-        withdrawal.notes = (withdrawal.notes || '') + ' | Auto-completed after 2 days in processing status';
+
+        // Add appropriate note based on previous status
+        if (previousStatus === WITHDRAWAL_STATUS.PENDING) {
+          withdrawal.notes = (withdrawal.notes || '') + ' | Auto-completed after 2 days (no admin action required)';
+        } else {
+          withdrawal.notes = (withdrawal.notes || '') + ' | Auto-completed after 2 days in processing status';
+        }
+
         await withdrawal.save();
 
         // Update driver's pending amount
@@ -118,16 +130,19 @@ async function autoCompleteStaleWithdrawals() {
         if (driver) {
           driver.wallet.pendingAmount = Math.max(0, (driver.wallet.pendingAmount || 0) - withdrawal.amount);
           await driver.save();
-          console.log(`[AutoComplete] ✅ Auto-completed withdrawal ${withdrawal._id} for driver ${driver._id}`);
+          console.log(`[AutoComplete] ✅ Auto-completed withdrawal ${withdrawal._id} for driver ${driver._id} (${previousStatus} → COMPLETED)`);
+          completedCount++;
         }
 
         // TODO: Send notification to driver about completed withdrawal
 
       } catch (withdrawalError) {
         console.error(`[AutoComplete] ❌ Error auto-completing withdrawal ${withdrawal._id}:`, withdrawalError.message);
+        errorCount++;
       }
     }
 
+    console.log(`[AutoComplete] Summary: ${completedCount} completed, ${errorCount} errors`);
     console.log('========== AUTO-COMPLETE JOB COMPLETED ==========\n');
 
   } catch (error) {
