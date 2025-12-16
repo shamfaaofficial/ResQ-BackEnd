@@ -22,6 +22,11 @@ exports.updatePaymentStatus = asyncHandler(async (req, res) => {
     gatewayResponse     // Full MyFatoorah response object from Flutter
   } = req.body;
 
+  console.log('📱 [FlutterPaymentUpdate] Received payment update from Flutter app');
+  console.log('   Booking ID:', bookingId);
+  console.log('   Payment Status:', paymentStatus);
+  console.log('   Transaction ID:', transactionId);
+
   // Find booking and verify it belongs to the user
   const booking = await Booking.findOne({
     _id: bookingId,
@@ -379,6 +384,9 @@ exports.handlePaymentCallback = asyncHandler(async (req, res) => {
   const { paymentId, Id } = req.query; // MyFatoorah sends 'paymentId' or 'Id'
   const paymentService = require('../services/payment.service');
 
+  console.log('🔔 [PaymentCallback] Received callback from MyFatoorah');
+  console.log('   Query params:', JSON.stringify(req.query));
+
   const actualPaymentId = paymentId || Id;
 
   if (!actualPaymentId) {
@@ -390,17 +398,20 @@ exports.handlePaymentCallback = asyncHandler(async (req, res) => {
     const result = await paymentService.processPaymentCallback(actualPaymentId);
 
     if (result.success) {
+      console.log('✅ [PaymentCallback] Payment successful for booking:', result.booking.bookingNumber);
       // Redirect to success page with booking details
       return res.redirect(
         `${process.env.FRONTEND_URL || 'https://resq-app.com'}/payment/success?bookingId=${result.booking._id}&bookingNumber=${result.booking.bookingNumber}`
       );
     } else {
+      console.log('❌ [PaymentCallback] Payment failed:', result.message);
       // Redirect to error page
       return res.redirect(
         `${process.env.FRONTEND_URL || 'https://resq-app.com'}/payment/error?reason=${encodeURIComponent(result.message)}`
       );
     }
   } catch (error) {
+    console.log('❌ [PaymentCallback] Error processing callback:', error.message);
     return res.redirect(
       `${process.env.FRONTEND_URL || 'https://resq-app.com'}/payment/error?reason=${encodeURIComponent(error.message)}`
     );
@@ -414,6 +425,9 @@ exports.handlePaymentCallback = asyncHandler(async (req, res) => {
 exports.handlePaymentWebhook = asyncHandler(async (req, res) => {
   const paymentService = require('../services/payment.service');
 
+  console.log('🔔 [PaymentWebhook] Received webhook from MyFatoorah');
+  console.log('   Request body:', JSON.stringify(req.body, null, 2));
+
   const { Data } = req.body;
 
   if (!Data || !Data.InvoiceId) {
@@ -425,6 +439,7 @@ exports.handlePaymentWebhook = asyncHandler(async (req, res) => {
     const paymentStatus = await paymentService.getPaymentStatus(Data.InvoiceId);
 
     if (paymentStatus.success && paymentStatus.isPaid) {
+      console.log('✅ [PaymentWebhook] Payment verified as paid');
       // Find booking by customer reference (booking ID)
       const booking = await Booking.findById(paymentStatus.customerReference);
 
@@ -456,6 +471,8 @@ exports.handlePaymentWebhook = asyncHandler(async (req, res) => {
         };
 
         await booking.save();
+
+        console.log('✅ [PaymentWebhook] Booking updated to payment_completed:', booking.bookingNumber);
 
         // Create transaction record
         await Transaction.create({
@@ -521,6 +538,7 @@ exports.handlePaymentWebhook = asyncHandler(async (req, res) => {
             };
 
             emitToDriver(driver._id.toString(), 'trip:assigned', tripDetails);
+            console.log('✅ [PaymentWebhook] Trip details sent to driver');
           }
         }
 
@@ -547,6 +565,9 @@ exports.handlePaymentWebhook = asyncHandler(async (req, res) => {
 exports.handlePaymentError = asyncHandler(async (req, res) => {
   const { paymentId, Id } = req.query;
   const paymentService = require('../services/payment.service');
+
+  console.log('❌ [PaymentError] Payment error callback received');
+  console.log('   Query params:', JSON.stringify(req.query));
 
   const actualPaymentId = paymentId || Id;
 

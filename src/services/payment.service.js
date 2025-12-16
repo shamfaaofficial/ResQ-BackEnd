@@ -28,6 +28,11 @@ class MyFatoorahPaymentService {
       const callbackUrl = `${process.env.APP_BASE_URL || 'https://dev.resq-qa.com'}/api/v1/payment/callback`;
       const errorUrl = `${process.env.APP_BASE_URL || 'https://dev.resq-qa.com'}/api/v1/payment/error`;
 
+      console.log('💳 [MyFatoorah] Initiating payment for booking:', booking.bookingNumber);
+      console.log('   📍 Callback URL:', callbackUrl);
+      console.log('   📍 Error URL:', errorUrl);
+      console.log('   💰 Amount:', booking.pricing.totalAmount, 'QAR');
+
       // Extract mobile number without country code
       let customerMobile = user.phoneNumber;
       let mobileCountryCode = '+974'; // Default Qatar
@@ -79,6 +84,9 @@ class MyFatoorahPaymentService {
       );
 
       if (response.data.IsSuccess) {
+        console.log('✅ [MyFatoorah] Payment URL generated successfully');
+        console.log('   🔗 Payment URL:', response.data.Data.InvoiceURL);
+        console.log('   🆔 Invoice ID:', response.data.Data.InvoiceId);
         return {
           success: true,
           paymentUrl: response.data.Data.InvoiceURL,
