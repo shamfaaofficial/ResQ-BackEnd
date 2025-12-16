@@ -85,10 +85,21 @@ class MyFatoorahPaymentService {
         { headers: this.getHeaders() }
       );
 
+      console.log('📥 [MyFatoorah] SendPayment FULL RESPONSE:', JSON.stringify(response.data, null, 2));
+
       if (response.data.IsSuccess) {
         console.log('✅ [MyFatoorah] Payment URL generated successfully');
         console.log('   🔗 Payment URL:', response.data.Data.InvoiceURL);
         console.log('   🆔 Invoice ID:', response.data.Data.InvoiceId);
+
+        // Check if there are any warnings or messages from MyFatoorah
+        if (response.data.Message) {
+          console.log('   ⚠️ MyFatoorah Message:', response.data.Message);
+        }
+        if (response.data.ValidationErrors && response.data.ValidationErrors.length > 0) {
+          console.log('   ⚠️ Validation Errors:', JSON.stringify(response.data.ValidationErrors, null, 2));
+        }
+
         return {
           success: true,
           paymentUrl: response.data.Data.InvoiceURL,

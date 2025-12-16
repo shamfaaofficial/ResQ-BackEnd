@@ -577,6 +577,9 @@ exports.handlePaymentError = asyncHandler(async (req, res) => {
       const paymentStatus = await paymentService.getPaymentStatus(actualPaymentId);
 
       console.log('❌ [PaymentError] Payment status from MyFatoorah:', JSON.stringify(paymentStatus, null, 2));
+      console.log('❌ [PaymentError] Invoice Status:', paymentStatus.status);
+      console.log('❌ [PaymentError] Error Message:', paymentStatus.errorMessage || 'No error message');
+      console.log('❌ [PaymentError] Customer Reference (Booking ID):', paymentStatus.customerReference);
 
       // Try to find and update the booking
       if (paymentStatus.customerReference) {
