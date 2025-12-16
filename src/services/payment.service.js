@@ -77,6 +77,8 @@ class MyFatoorahPaymentService {
         payload.CustomerEmail = user.email;
       }
 
+      console.log('📤 [MyFatoorah] Sending payment request with payload:', JSON.stringify(payload, null, 2));
+
       const response = await axios.post(
         `${this.baseURL}/v2/SendPayment`,
         payload,
@@ -114,6 +116,8 @@ class MyFatoorahPaymentService {
    */
   async getPaymentStatus(paymentId) {
     try {
+      console.log('🔍 [MyFatoorah] Checking payment status for paymentId:', paymentId);
+
       const response = await axios.post(
         `${this.baseURL}/v2/GetPaymentStatus`,
         {
@@ -122,6 +126,8 @@ class MyFatoorahPaymentService {
         },
         { headers: this.getHeaders() }
       );
+
+      console.log('📊 [MyFatoorah] GetPaymentStatus raw response:', JSON.stringify(response.data, null, 2));
 
       if (response.data.IsSuccess) {
         const paymentData = response.data.Data;
@@ -133,15 +139,18 @@ class MyFatoorahPaymentService {
           paymentDate: paymentData.InvoiceTransactions?.[0]?.TransactionDate,
           paymentMethod: paymentData.InvoiceTransactions?.[0]?.PaymentGateway,
           customerReference: paymentData.CustomerReference,
-          isPaid: paymentData.InvoiceStatus === 'Paid'
+          isPaid: paymentData.InvoiceStatus === 'Paid',
+          errorMessage: paymentData.InvoiceError || null
         };
       } else {
+        console.log('❌ [MyFatoorah] GetPaymentStatus failed:', response.data.Message);
         return {
           success: false,
           message: response.data.Message
         };
       }
     } catch (error) {
+      console.log('❌ [MyFatoorah] GetPaymentStatus error:', error.response?.data || error.message);
       throw new Error(`Payment status check failed: ${error.response?.data?.Message || error.message}`);
     }
   }
