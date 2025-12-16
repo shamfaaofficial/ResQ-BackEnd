@@ -21,13 +21,6 @@ class MyFatoorahPaymentService {
    */
   async initiatePayment(booking, user) {
     try {
-      // Debug: Check if API key is loaded
-      console.log('🔑 MyFatoorah API Key Check:');
-      console.log('   - API Key exists:', !!this.apiKey);
-      console.log('   - API Key length:', this.apiKey?.length || 0);
-      console.log('   - API Key preview:', this.apiKey ? `${this.apiKey.substring(0, 20)}...` : 'MISSING');
-      console.log('   - Base URL:', this.baseURL);
-
       if (!this.apiKey || this.apiKey === 'your_al_fatoorah_api_key_here') {
         throw new Error('MyFatoorah API key is not configured. Please set AL_FATOORAH_API_KEY in environment variables.');
       }
@@ -79,15 +72,11 @@ class MyFatoorahPaymentService {
         payload.CustomerEmail = user.email;
       }
 
-      console.log('🔄 Initiating MyFatoorah payment:', payload);
-
       const response = await axios.post(
         `${this.baseURL}/v2/SendPayment`,
         payload,
         { headers: this.getHeaders() }
       );
-
-      console.log('✅ MyFatoorah response:', response.data);
 
       if (response.data.IsSuccess) {
         return {
@@ -100,13 +89,11 @@ class MyFatoorahPaymentService {
         throw new Error(response.data.Message || 'Payment initiation failed');
       }
     } catch (error) {
-      console.error('❌ MyFatoorah payment initiation error:');
-      console.error('   - Status:', error.response?.status);
-      console.error('   - Status Text:', error.response?.statusText);
-      console.error('   - Response Data:', JSON.stringify(error.response?.data, null, 2));
-      console.error('   - Error Message:', error.message);
-
       if (error.response?.status === 401) {
+        console.error('❌ MyFatoorah API Authentication Failed (401 Unauthorized)');
+        console.error('API Key being used:', this.apiKey ? `${this.apiKey.substring(0, 50)}...${this.apiKey.substring(this.apiKey.length - 20)}` : 'MISSING');
+        console.error('Base URL:', this.baseURL);
+        console.error('Full API Key (for verification):', this.apiKey);
         throw new Error('MyFatoorah API authentication failed. Please verify your API key is correct and has not expired.');
       }
 
@@ -147,7 +134,6 @@ class MyFatoorahPaymentService {
         };
       }
     } catch (error) {
-      console.error('❌ MyFatoorah payment status check error:', error.response?.data || error.message);
       throw new Error(`Payment status check failed: ${error.response?.data?.Message || error.message}`);
     }
   }
@@ -198,8 +184,6 @@ class MyFatoorahPaymentService {
           isVerified: false
         };
 
-        console.log(`[PaymentCallback] 🔐 Generated verification code: ${verificationCode} for booking ${booking.bookingNumber}`);
-
         await booking.save();
 
         // Create transaction record
@@ -216,8 +200,6 @@ class MyFatoorahPaymentService {
           gatewayTransactionId: paymentStatus.transactionId,
           description: `Payment for booking ${booking.bookingNumber}`
         });
-
-        console.log(`✅ Payment successful for booking ${booking.bookingNumber}`);
 
         return {
           success: true,
@@ -240,7 +222,6 @@ class MyFatoorahPaymentService {
         };
       }
     } catch (error) {
-      console.error('❌ Payment callback processing error:', error.message);
       throw error;
     }
   }
@@ -293,7 +274,6 @@ class MyFatoorahPaymentService {
         throw new Error(response.data.Message || 'Refund failed');
       }
     } catch (error) {
-      console.error('❌ Refund error:', error.response?.data || error.message);
       throw new Error(`Refund failed: ${error.response?.data?.Message || error.message}`);
     }
   }

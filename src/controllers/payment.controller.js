@@ -108,8 +108,6 @@ exports.updatePaymentStatus = asyncHandler(async (req, res) => {
         }
 
         // IMPORTANT: NOW send full trip details via socket to driver
-        console.log('[PaymentUpdate] 🚨 Payment completed - sending full trip details to driver');
-
         // Populate full booking details for driver
         await booking.populate('userId', 'phoneNumber profile');
 
@@ -142,7 +140,6 @@ exports.updatePaymentStatus = asyncHandler(async (req, res) => {
         };
 
         emitToDriver(driver._id.toString(), 'trip:assigned', tripDetails);
-        console.log('[PaymentUpdate] ✅ Full trip details sent to driver via socket');
       }
     }
 
@@ -150,7 +147,7 @@ exports.updatePaymentStatus = asyncHandler(async (req, res) => {
     try {
       emitBookingUpdate(booking);
     } catch (error) {
-      console.error('[PaymentUpdate] Failed to emit socket event:', error.message);
+      // Socket emit failed - non-critical
     }
   }
 
@@ -250,12 +247,6 @@ exports.getPaymentDetails = asyncHandler(async (req, res) => {
   const requestUserId = req.userId.toString(); // Convert ObjectId to string
   const isUser = bookingUserId === requestUserId;
 
-  console.log('[GetPaymentDetails] Authorization check:');
-  console.log('  - req.userId:', req.userId);
-  console.log('  - booking.userId:', bookingUserId);
-  console.log('  - isUser:', isUser);
-  console.log('  - isDriver:', isDriver);
-
   if (!isDriver && !isUser) {
     throw new ValidationError('You are not authorized to view this payment');
   }
@@ -294,8 +285,6 @@ exports.initiatePaymentFromBody = asyncHandler(async (req, res) => {
     throw new ValidationError('bookingId is required in request body');
   }
 
-  console.log(`[InitiatePaymentFromBody] User ${req.userId} initiating payment for booking ${bookingId}`);
-
   // Forward to the main initiatePayment logic by setting params
   req.params.bookingId = bookingId;
   return exports.initiatePayment(req, res);
@@ -309,8 +298,6 @@ exports.initiatePayment = asyncHandler(async (req, res) => {
   const { bookingId } = req.params;
   const paymentService = require('../services/payment.service');
   const User = require('../models/User');
-
-  console.log(`[InitiatePayment] User ${req.userId} initiating payment for booking ${bookingId}`);
 
   // Find booking and verify it belongs to the user
   const booking = await Booking.findOne({
@@ -365,9 +352,6 @@ exports.initiatePayment = asyncHandler(async (req, res) => {
     };
     await booking.save();
 
-    console.log(`[InitiatePayment] ✅ Payment URL generated for booking ${booking.bookingNumber}`);
-    console.log(`[InitiatePayment] Payment URL: ${paymentResponse.paymentUrl}`);
-
     res.status(200).json({
       success: true,
       message: 'Payment initiated successfully',
@@ -383,7 +367,6 @@ exports.initiatePayment = asyncHandler(async (req, res) => {
       }
     });
   } catch (error) {
-    console.error(`[InitiatePayment] ❌ Error:`, error.message);
     throw new Error(`Payment initiation failed: ${error.message}`);
   }
 });
@@ -396,13 +379,9 @@ exports.handlePaymentCallback = asyncHandler(async (req, res) => {
   const { paymentId, Id } = req.query; // MyFatoorah sends 'paymentId' or 'Id'
   const paymentService = require('../services/payment.service');
 
-  console.log(`[PaymentCallback] Received callback with paymentId: ${paymentId || Id}`);
-  console.log(`[PaymentCallback] Query params:`, req.query);
-
   const actualPaymentId = paymentId || Id;
 
   if (!actualPaymentId) {
-    console.error('[PaymentCallback] ❌ No payment ID provided');
     return res.redirect(`${process.env.FRONTEND_URL || 'https://resq-app.com'}/payment/error?reason=missing_payment_id`);
   }
 
@@ -411,23 +390,17 @@ exports.handlePaymentCallback = asyncHandler(async (req, res) => {
     const result = await paymentService.processPaymentCallback(actualPaymentId);
 
     if (result.success) {
-      console.log(`[PaymentCallback] ✅ Payment successful for booking ${result.booking.bookingNumber}`);
-
       // Redirect to success page with booking details
       return res.redirect(
         `${process.env.FRONTEND_URL || 'https://resq-app.com'}/payment/success?bookingId=${result.booking._id}&bookingNumber=${result.booking.bookingNumber}`
       );
     } else {
-      console.error(`[PaymentCallback] ❌ Payment failed:`, result.message);
-
       // Redirect to error page
       return res.redirect(
         `${process.env.FRONTEND_URL || 'https://resq-app.com'}/payment/error?reason=${encodeURIComponent(result.message)}`
       );
     }
   } catch (error) {
-    console.error(`[PaymentCallback] ❌ Error processing callback:`, error.message);
-
     return res.redirect(
       `${process.env.FRONTEND_URL || 'https://resq-app.com'}/payment/error?reason=${encodeURIComponent(error.message)}`
     );
@@ -441,13 +414,9 @@ exports.handlePaymentCallback = asyncHandler(async (req, res) => {
 exports.handlePaymentWebhook = asyncHandler(async (req, res) => {
   const paymentService = require('../services/payment.service');
 
-  console.log(`[PaymentWebhook] Received webhook from MyFatoorah`);
-  console.log(`[PaymentWebhook] Body:`, JSON.stringify(req.body, null, 2));
-
   const { Data } = req.body;
 
   if (!Data || !Data.InvoiceId) {
-    console.error('[PaymentWebhook] ❌ Invalid webhook data');
     return res.status(400).json({ success: false, message: 'Invalid webhook data' });
   }
 
@@ -460,7 +429,6 @@ exports.handlePaymentWebhook = asyncHandler(async (req, res) => {
       const booking = await Booking.findById(paymentStatus.customerReference);
 
       if (!booking) {
-        console.error(`[PaymentWebhook] ❌ Booking not found: ${paymentStatus.customerReference}`);
         return res.status(404).json({ success: false, message: 'Booking not found' });
       }
 
@@ -487,8 +455,6 @@ exports.handlePaymentWebhook = asyncHandler(async (req, res) => {
           isVerified: false
         };
 
-        console.log(`[PaymentWebhook] 🔐 Generated verification code: ${verificationCode} for booking ${booking.bookingNumber}`);
-
         await booking.save();
 
         // Create transaction record
@@ -506,8 +472,6 @@ exports.handlePaymentWebhook = asyncHandler(async (req, res) => {
           description: `Payment for booking ${booking.bookingNumber}`
         });
 
-        console.log(`[PaymentWebhook] ✅ Payment webhook processed for booking ${booking.bookingNumber}`);
-
         // Notify driver and send full trip details
         if (booking.driverId) {
           const driver = await Driver.findById(booking.driverId).populate('userId', 'fcmToken phoneNumber profile');
@@ -524,8 +488,6 @@ exports.handlePaymentWebhook = asyncHandler(async (req, res) => {
             }
 
             // IMPORTANT: Send full trip details via socket to driver
-            console.log('[PaymentWebhook] 🚨 Payment completed via webhook - sending full trip details to driver');
-
             // Populate user details
             await booking.populate('userId', 'phoneNumber profile');
 
@@ -559,7 +521,6 @@ exports.handlePaymentWebhook = asyncHandler(async (req, res) => {
             };
 
             emitToDriver(driver._id.toString(), 'trip:assigned', tripDetails);
-            console.log('[PaymentWebhook] ✅ Full trip details sent to driver via socket');
           }
         }
 
@@ -567,17 +528,15 @@ exports.handlePaymentWebhook = asyncHandler(async (req, res) => {
         try {
           emitBookingUpdate(booking);
         } catch (error) {
-          console.error('[PaymentWebhook] Failed to emit booking update:', error.message);
+          // Socket emit failed - non-critical
         }
       }
 
       return res.status(200).json({ success: true, message: 'Webhook processed successfully' });
     } else {
-      console.error(`[PaymentWebhook] ❌ Payment not successful:`, paymentStatus);
       return res.status(200).json({ success: true, message: 'Payment not completed' });
     }
   } catch (error) {
-    console.error(`[PaymentWebhook] ❌ Error processing webhook:`, error.message);
     return res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -589,16 +548,12 @@ exports.handlePaymentError = asyncHandler(async (req, res) => {
   const { paymentId, Id } = req.query;
   const paymentService = require('../services/payment.service');
 
-  console.log(`[PaymentError] Payment error callback received`);
-  console.log(`[PaymentError] Query params:`, req.query);
-
   const actualPaymentId = paymentId || Id;
 
   try {
     // Get payment status from MyFatoorah to understand what went wrong
     if (actualPaymentId) {
       const paymentStatus = await paymentService.getPaymentStatus(actualPaymentId);
-      console.log(`[PaymentError] Payment status from MyFatoorah:`, JSON.stringify(paymentStatus, null, 2));
 
       // Try to find and update the booking
       if (paymentStatus.CustomerReference) {
@@ -611,12 +566,11 @@ exports.handlePaymentError = asyncHandler(async (req, res) => {
             gatewayResponse: paymentStatus
           };
           await booking.save();
-          console.log(`[PaymentError] ❌ Booking ${booking.bookingNumber} payment marked as failed`);
         }
       }
     }
   } catch (error) {
-    console.error(`[PaymentError] Error fetching payment status:`, error.message);
+    // Error fetching payment status - non-critical
   }
 
   // Redirect to frontend error page
