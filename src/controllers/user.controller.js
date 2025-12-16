@@ -381,18 +381,32 @@ exports.getRideHistory = asyncHandler(async (req, res) => {
     }
 
     // Generate signed URL for driver profile image
+    let profileImageSignedUrl = null;
     if (booking.driverId?.userId?.profile?.profileImage) {
       try {
         const s3Key = extractS3Key(booking.driverId.userId.profile.profileImage);
-        const signedUrl = await getSignedFileUrl(s3Key, 3600); // 1 hour expiry
-        booking.driverId.userId.profile.profileImageSignedUrl = signedUrl;
+        profileImageSignedUrl = await getSignedFileUrl(s3Key, 3600); // 1 hour expiry
+        console.log('[GetRideHistory] Generated signed URL for driver:', booking.driverId._id);
       } catch (error) {
         console.error('[GetRideHistory] Failed to generate signed URL for driver profile:', error.message);
         // Continue without signed URL - don't fail the request
       }
     }
 
-    return booking;
+    // Return booking with signed URL added to driver profile
+    return {
+      ...booking,
+      driverId: booking.driverId ? {
+        ...booking.driverId,
+        userId: booking.driverId.userId ? {
+          ...booking.driverId.userId,
+          profile: booking.driverId.userId.profile ? {
+            ...booking.driverId.userId.profile,
+            profileImageSignedUrl: profileImageSignedUrl
+          } : null
+        } : null
+      } : null
+    };
   }));
 
   // Calculate statistics
