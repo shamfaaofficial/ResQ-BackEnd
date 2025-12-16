@@ -367,8 +367,11 @@ exports.getRideHistory = asyncHandler(async (req, res) => {
   ]);
 
   // CRITICAL: Filter out driver details for bookings where payment is not completed
+  // AND generate signed URLs for driver profile images
   const { PAYMENT_STATUS } = require('../config/constants');
-  const filteredBookings = bookings.map(booking => {
+  const { extractS3Key, getSignedFileUrl } = require('../config/s3');
+
+  const filteredBookings = await Promise.all(bookings.map(async (booking) => {
     if (booking.payment?.status !== PAYMENT_STATUS.COMPLETED) {
       // Remove driver details if payment not completed
       return {
@@ -376,8 +379,21 @@ exports.getRideHistory = asyncHandler(async (req, res) => {
         driverId: null
       };
     }
+
+    // Generate signed URL for driver profile image
+    if (booking.driverId?.userId?.profile?.profileImage) {
+      try {
+        const s3Key = extractS3Key(booking.driverId.userId.profile.profileImage);
+        const signedUrl = await getSignedFileUrl(s3Key, 3600); // 1 hour expiry
+        booking.driverId.userId.profile.profileImageSignedUrl = signedUrl;
+      } catch (error) {
+        console.error('[GetRideHistory] Failed to generate signed URL for driver profile:', error.message);
+        // Continue without signed URL - don't fail the request
+      }
+    }
+
     return booking;
-  });
+  }));
 
   // Calculate statistics
   const mongoose = require('mongoose');
