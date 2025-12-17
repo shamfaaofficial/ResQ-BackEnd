@@ -22,3 +22,5 @@ mongoose.connect(process.env.MONGODB_URI).then(async () => {
 
   await mongoose.disconnect();
 }).catch(err => console.error('Error:', err.message));
+
+// TEST COMMENT TO VERIFY GIT TRACKING
