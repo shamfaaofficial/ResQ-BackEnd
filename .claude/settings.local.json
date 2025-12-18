@@ -14,7 +14,10 @@
       "Bash(git push:*)",
       "Bash(npm run dev:*)",
       "Bash(timeout:*)",
-      "Bash(taskkill:*)"
+      "Bash(taskkill:*)",
+      "Bash(cat:*)",
+      "Bash(nslookup:*)",
+      "Bash(host:*)"
     ],
     "deny": [],
     "ask": []
