@@ -120,6 +120,9 @@ exports.uploadProfilePicture = asyncHandler(async (req, res) => {
   });
 });
 
+// Store last location update times per driver
+const driverLocationUpdateTimes = new Map();
+
 // Update driver location
 exports.updateLocation = asyncHandler(async (req, res) => {
   const { latitude, longitude, address, speed, heading, accuracy } = req.body;
@@ -132,6 +135,20 @@ exports.updateLocation = asyncHandler(async (req, res) => {
   if (!driver) {
     throw new NotFoundError('Driver profile not found');
   }
+
+  // Track location update interval in YELLOW
+  const currentTime = Date.now();
+  const lastUpdateTime = driverLocationUpdateTimes.get(driver._id.toString());
+
+  if (lastUpdateTime) {
+    const intervalSeconds = ((currentTime - lastUpdateTime) / 1000).toFixed(2);
+    console.log(`\x1b[33m⏱️  [LOCATION INTERVAL] Driver ${driver._id} location retrieved after ${intervalSeconds} seconds (${intervalSeconds}s interval)\x1b[0m`);
+  } else {
+    console.log(`\x1b[33m⏱️  [LOCATION INTERVAL] Driver ${driver._id} first location update in this session\x1b[0m`);
+  }
+
+  // Store current update time for next comparison
+  driverLocationUpdateTimes.set(driver._id.toString(), currentTime);
 
   const lng = parseFloat(longitude);
   const lat = parseFloat(latitude);
