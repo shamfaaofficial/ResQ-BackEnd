@@ -18,12 +18,34 @@ class SMSService {
 
       console.log(`📤 Attempting to send SMS to: ${formattedPhone}`);
 
+      // Check if Twilio client is initialized
+      if (!twilioClient) {
+        console.warn('⚠️  Twilio client not initialized - running in development mode');
+        console.log(`📱 Phone: ${formattedPhone}`);
+        console.log(`🔢 OTP Code: ${otp}`);
+        console.log(`⏰ Valid for 5 minutes\n`);
+        return { success: true, messageSid: 'dev-mode-no-twilio' };
+      }
+
       // Send SMS via Twilio
-      const message = await twilioClient.messages.create({
+      // Support both Messaging Service (recommended for production) and direct phone number
+      const messageConfig = {
         body: messageBody,
-        from: process.env.TWILIO_PHONE_NUMBER,
         to: formattedPhone
-      });
+      };
+
+      // Use Messaging Service if configured (better for international SMS)
+      if (process.env.TWILIO_MESSAGING_SERVICE_SID && process.env.TWILIO_MESSAGING_SERVICE_SID.startsWith('MG')) {
+        messageConfig.messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
+        console.log(`📨 Using Messaging Service: ${process.env.TWILIO_MESSAGING_SERVICE_SID}`);
+      } else if (process.env.TWILIO_PHONE_NUMBER && process.env.TWILIO_PHONE_NUMBER.startsWith('+')) {
+        messageConfig.from = process.env.TWILIO_PHONE_NUMBER;
+        console.log(`📞 Using Phone Number: ${process.env.TWILIO_PHONE_NUMBER}`);
+      } else {
+        throw new Error('Either TWILIO_MESSAGING_SERVICE_SID or TWILIO_PHONE_NUMBER must be configured');
+      }
+
+      const message = await twilioClient.messages.create(messageConfig);
 
       console.log(`✅ SMS sent successfully!`);
       console.log(`   📱 To: ${formattedPhone}`);
@@ -68,11 +90,19 @@ class SMSService {
     try {
       const formattedPhone = formatQatarPhone(phoneNumber);
 
-      const sms = await twilioClient.messages.create({
+      const messageConfig = {
         body: message,
-        from: process.env.TWILIO_PHONE_NUMBER,
         to: formattedPhone
-      });
+      };
+
+      // Use Messaging Service if configured, otherwise use phone number
+      if (process.env.TWILIO_MESSAGING_SERVICE_SID) {
+        messageConfig.messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
+      } else {
+        messageConfig.from = process.env.TWILIO_PHONE_NUMBER;
+      }
+
+      const sms = await twilioClient.messages.create(messageConfig);
 
       return { success: true, messageSid: sms.sid };
     } catch (error) {
@@ -88,11 +118,19 @@ class SMSService {
     try {
       const formattedPhone = formatQatarPhone(phoneNumber);
 
-      const sms = await twilioClient.messages.create({
+      const messageConfig = {
         body: message,
-        from: process.env.TWILIO_PHONE_NUMBER,
         to: formattedPhone
-      });
+      };
+
+      // Use Messaging Service if configured, otherwise use phone number
+      if (process.env.TWILIO_MESSAGING_SERVICE_SID) {
+        messageConfig.messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
+      } else {
+        messageConfig.from = process.env.TWILIO_PHONE_NUMBER;
+      }
+
+      const sms = await twilioClient.messages.create(messageConfig);
 
       return { success: true, messageSid: sms.sid };
     } catch (error) {
