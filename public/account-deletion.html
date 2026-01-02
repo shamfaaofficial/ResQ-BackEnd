@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="RESQ App - Account Deletion Request. Learn how to delete your RESQ account and understand what data will be removed.">
+    <title>Account Deletion - RESQ</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --primary-dark: #1d4ed8;
+            --secondary-color: #f59e0b;
+            --background-gradient: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+            --card-bg: rgba(255, 255, 255, 0.05);
+            --card-border: rgba(255, 255, 255, 0.1);
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --danger-color: #ef4444;
+            --success-color: #22c55e;
+            --warning-color: #f59e0b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--background-gradient);
+            min-height: 100vh;
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 48px;
+        }
+
+        .logo {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .logo-icon {
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            box-shadow: 0 8px 32px rgba(37, 99, 235, 0.3);
+        }
+
+        .logo-text {
+            font-size: 32px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--text-primary), var(--secondary-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .header p {
+            color: var(--text-secondary);
+            font-size: 16px;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 32px;
+            margin-bottom: 24px;
+            backdrop-filter: blur(10px);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .card-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .card-icon.blue { background: rgba(37, 99, 235, 0.2); }
+        .card-icon.red { background: rgba(239, 68, 68, 0.2); }
+        .card-icon.green { background: rgba(34, 197, 94, 0.2); }
+        .card-icon.orange { background: rgba(245, 158, 11, 0.2); }
+
+        .card h2 {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .card h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 12px;
+            margin-top: 20px;
+        }
+
+        .card h3:first-of-type {
+            margin-top: 0;
+        }
+
+        /* Steps */
+        .steps {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .step {
+            display: flex;
+            gap: 16px;
+            align-items: flex-start;
+        }
+
+        .step-number {
+            width: 32px;
+            height: 32px;
+            min-width: 32px;
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 14px;
+            color: white;
+        }
+
+        .step-content h4 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: var(--text-primary);
+        }
+
+        .step-content p {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        /* Data Lists */
+        .data-list {
+            display: grid;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .data-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .data-item.deleted .icon { color: var(--danger-color); }
+        .data-item.retained .icon { color: var(--warning-color); }
+
+        .data-item .icon {
+            font-size: 18px;
+        }
+
+        .data-item span {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        /* Info Box */
+        .info-box {
+            background: rgba(37, 99, 235, 0.1);
+            border: 1px solid rgba(37, 99, 235, 0.3);
+            border-radius: 12px;
+            padding: 16px 20px;
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            margin-top: 20px;
+        }
+
+        .info-box.warning {
+            background: rgba(245, 158, 11, 0.1);
+            border-color: rgba(245, 158, 11, 0.3);
+        }
+
+        .info-box .icon {
+            font-size: 20px;
+            margin-top: 2px;
+        }
+
+        .info-box p {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        /* Contact Section */
+        .contact-methods {
+            display: grid;
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .contact-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px 20px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .contact-item:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: var(--primary-color);
+            transform: translateX(4px);
+        }
+
+        .contact-item .icon {
+            width: 40px;
+            height: 40px;
+            background: rgba(37, 99, 235, 0.2);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .contact-item .details {
+            flex: 1;
+        }
+
+        .contact-item .label {
+            font-size: 12px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .contact-item .value {
+            font-size: 16px;
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        .footer p {
+            margin-bottom: 8px;
+        }
+
+        .footer a {
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* Responsive */
+        @media (max-width: 640px) {
+            .container {
+                padding: 24px 16px;
+            }
+
+            .card {
+                padding: 24px 20px;
+            }
+
+            .header h1 {
+                font-size: 24px;
+            }
+
+            .logo-text {
+                font-size: 28px;
+            }
+
+            .step {
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .step-number {
+                width: 28px;
+                height: 28px;
+                min-width: 28px;
+                font-size: 12px;
+            }
+        }
+
+        /* Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .card {
+            animation: fadeInUp 0.6s ease forwards;
+        }
+
+        .card:nth-child(2) { animation-delay: 0.1s; }
+        .card:nth-child(3) { animation-delay: 0.2s; }
+        .card:nth-child(4) { animation-delay: 0.3s; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <div class="logo-icon">🚗</div>
+                <span class="logo-text">RESQ</span>
+            </div>
+            <h1>Account Deletion Request</h1>
+            <p>Learn how to delete your RESQ account and associated data</p>
+        </header>
+
+        <!-- How to Delete Section -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-icon blue">📱</div>
+                <h2>How to Delete Your Account</h2>
+            </div>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h4>Open the RESQ App</h4>
+                        <p>Launch the RESQ application on your mobile device and ensure you are logged in to your account.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h4>Go to Profile Settings</h4>
+                        <p>Tap on your profile icon and navigate to "Settings" or "Account Settings".</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h4>Select "Delete Account"</h4>
+                        <p>Scroll down to find the "Delete Account" option and tap on it.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <div class="step-content">
+                        <h4>Confirm Your Identity</h4>
+                        <p>Enter your password to verify your identity and confirm the deletion request.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">5</div>
+                    <div class="step-content">
+                        <h4>Account Deleted</h4>
+                        <p>Your account will be deactivated immediately. All associated data will be processed for deletion.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="info-box">
+                <span class="icon">ℹ️</span>
+                <p>If you're unable to access the app, you can request account deletion by contacting our support team via email.</p>
+            </div>
+        </div>
+
+        <!-- Data Deleted Section -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-icon red">🗑️</div>
+                <h2>Data That Will Be Deleted</h2>
+            </div>
+            <p style="color: var(--text-secondary); margin-bottom: 16px;">
+                When you delete your account, the following data will be permanently removed:
+            </p>
+            <div class="data-list">
+                <div class="data-item deleted">
+                    <span class="icon">❌</span>
+                    <span>Personal information (name, email, phone number)</span>
+                </div>
+                <div class="data-item deleted">
+                    <span class="icon">❌</span>
+                    <span>Profile picture and account credentials</span>
+                </div>
+                <div class="data-item deleted">
+                    <span class="icon">❌</span>
+                    <span>Saved addresses and location history</span>
+                </div>
+                <div class="data-item deleted">
+                    <span class="icon">❌</span>
+                    <span>Booking and trip history</span>
+                </div>
+                <div class="data-item deleted">
+                    <span class="icon">❌</span>
+                    <span>Wallet balance and transaction history</span>
+                </div>
+                <div class="data-item deleted">
+                    <span class="icon">❌</span>
+                    <span>Ratings and reviews</span>
+                </div>
+                <div class="data-item deleted">
+                    <span class="icon">❌</span>
+                    <span>Notification preferences and FCM tokens</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Retained Section -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-icon orange">📁</div>
+                <h2>Data Retention Policy</h2>
+            </div>
+            <p style="color: var(--text-secondary); margin-bottom: 16px;">
+                Some data may be retained for legal, regulatory, or security purposes:
+            </p>
+            <div class="data-list">
+                <div class="data-item retained">
+                    <span class="icon">⚠️</span>
+                    <span>Transaction records (retained for 7 years for tax/legal compliance)</span>
+                </div>
+                <div class="data-item retained">
+                    <span class="icon">⚠️</span>
+                    <span>Anonymized analytics data (non-identifiable)</span>
+                </div>
+                <div class="data-item retained">
+                    <span class="icon">⚠️</span>
+                    <span>Legal dispute records (if applicable, until resolution)</span>
+                </div>
+            </div>
+            <div class="info-box warning">
+                <span class="icon">⏱️</span>
+                <p><strong>Processing Time:</strong> Account deletion is processed immediately upon confirmation. Some background data cleanup may take up to 30 days to complete across all systems.</p>
+            </div>
+        </div>
+
+        <!-- Contact Section -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-icon green">💬</div>
+                <h2>Need Help?</h2>
+            </div>
+            <p style="color: var(--text-secondary); margin-bottom: 16px;">
+                If you have questions or need assistance with account deletion, contact our support team:
+            </p>
+            <div class="contact-methods">
+                <a href="mailto:support@resq-qa.com" class="contact-item">
+                    <div class="icon">📧</div>
+                    <div class="details">
+                        <div class="label">Email Support</div>
+                        <div class="value">support@resq-qa.com</div>
+                    </div>
+                </a>
+                <a href="mailto:privacy@resq-qa.com" class="contact-item">
+                    <div class="icon">🔒</div>
+                    <div class="details">
+                        <div class="label">Privacy Inquiries</div>
+                        <div class="value">privacy@resq-qa.com</div>
+                    </div>
+                </a>
+            </div>
+            <div class="info-box">
+                <span class="icon">📝</span>
+                <p>When contacting support for account deletion, please include your registered phone number or email address for verification purposes.</p>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p><strong>RESQ</strong> - Tow Car Service Platform</p>
+            <p>© 2024 RESQ. All rights reserved.</p>
+            <p>
+                <a href="/privacy-policy">Privacy Policy</a> • 
+                <a href="/terms-of-service">Terms of Service</a>
+            </p>
+        </footer>
+    </div>
+</body>
+</html>
