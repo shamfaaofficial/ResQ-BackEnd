@@ -3,6 +3,7 @@ const User = require('../models/User');
 const Driver = require('../models/Driver');
 const otpService = require('../services/otp.service');
 const smsService = require('../services/sms.service');
+const twilioVerifyService = require('../services/twilioVerify.service');
 const { generateAccessToken, generateRefreshToken, hashPassword, comparePassword, cleanPhoneNumber } = require('../utils/helpers');
 const { ValidationError, AuthenticationError } = require('../utils/errors');
 const { OTP_PURPOSE } = require('../config/constants');
@@ -25,18 +26,16 @@ exports.userSignup = asyncHandler(async (req, res) => {
     throw new ValidationError('User with this phone number already exists');
   }
 
-  // Generate OTP
-  const { otpCode } = await otpService.generateOTP(phoneNumber, OTP_PURPOSE.SIGNUP);
-
-  // Send OTP via SMS
-  await smsService.sendOTP(phoneNumber, otpCode, OTP_PURPOSE.SIGNUP);
+  // Send OTP using Twilio Verify API
+  const result = await twilioVerifyService.sendOTP(phoneNumber, 'sms');
 
   res.status(200).json({
     success: true,
     message: 'OTP sent successfully to your phone number',
     data: {
       phoneNumber,
-      expiresIn: '5 minutes'
+      expiresIn: '10 minutes',
+      verificationSid: result.sid
     }
   });
 });
@@ -56,14 +55,13 @@ exports.userVerifyOTP = asyncHandler(async (req, res) => {
 
   console.log('📱 [userVerifyOTP] Extracted phoneNumber:', phoneNumber);
   console.log('📱 [userVerifyOTP] Extracted OTP:', otp);
-  console.log('📱 [userVerifyOTP] OTP Purpose:', OTP_PURPOSE.SIGNUP);
 
-  // Verify OTP
-  console.log('🔍 [userVerifyOTP] Calling otpService.verifyOTP...');
-  const isValid = await otpService.verifyOTP(phoneNumber, otp, OTP_PURPOSE.SIGNUP);
-  console.log('🔍 [userVerifyOTP] OTP verification result:', isValid);
+  // Verify OTP using Twilio Verify API
+  console.log('🔍 [userVerifyOTP] Calling twilioVerifyService.verifyOTP...');
+  const result = await twilioVerifyService.verifyOTP(phoneNumber, otp);
+  console.log('🔍 [userVerifyOTP] OTP verification result:', result);
 
-  if (!isValid) {
+  if (!result.valid) {
     console.log('❌ [userVerifyOTP] OTP verification failed');
     throw new ValidationError('Invalid or expired OTP');
   }
@@ -198,18 +196,16 @@ exports.userForgotPassword = asyncHandler(async (req, res) => {
     throw new ValidationError('No user found with this phone number');
   }
 
-  // Generate OTP
-  const { otpCode } = await otpService.generateOTP(phoneNumber, OTP_PURPOSE.PASSWORD_RESET);
-
-  // Send OTP via SMS
-  await smsService.sendOTP(phoneNumber, otpCode, OTP_PURPOSE.PASSWORD_RESET);
+  // Send OTP using Twilio Verify API
+  const result = await twilioVerifyService.sendOTP(phoneNumber, 'sms');
 
   res.status(200).json({
     success: true,
     message: 'OTP sent successfully for password reset',
     data: {
       phoneNumber,
-      expiresIn: '5 minutes'
+      expiresIn: '10 minutes',
+      verificationSid: result.sid
     }
   });
 });
@@ -222,9 +218,9 @@ exports.userResetPassword = asyncHandler(async (req, res) => {
     throw new ValidationError('All fields are required');
   }
 
-  // Verify OTP
-  const isValid = await otpService.verifyOTP(phoneNumber, otp, OTP_PURPOSE.PASSWORD_RESET);
-  if (!isValid) {
+  // Verify OTP using Twilio Verify API
+  const result = await twilioVerifyService.verifyOTP(phoneNumber, otp);
+  if (!result.valid) {
     throw new ValidationError('Invalid or expired OTP');
   }
 
@@ -333,18 +329,16 @@ exports.driverSignup = asyncHandler(async (req, res) => {
     throw new ValidationError('Driver with this phone number already exists');
   }
 
-  // Generate OTP
-  const { otpCode } = await otpService.generateOTP(phoneNumber, OTP_PURPOSE.SIGNUP);
-
-  // Send OTP via SMS
-  await smsService.sendOTP(phoneNumber, otpCode, OTP_PURPOSE.SIGNUP);
+  // Send OTP using Twilio Verify API
+  const result = await twilioVerifyService.sendOTP(phoneNumber, 'sms');
 
   res.status(200).json({
     success: true,
     message: 'OTP sent successfully to your phone number',
     data: {
       phoneNumber,
-      expiresIn: '5 minutes'
+      expiresIn: '10 minutes',
+      verificationSid: result.sid
     }
   });
 });
@@ -358,9 +352,9 @@ exports.driverVerifyOTP = asyncHandler(async (req, res) => {
     throw new ValidationError('Phone number and OTP are required');
   }
 
-  // Verify OTP
-  const isValid = await otpService.verifyOTP(phoneNumber, otp, OTP_PURPOSE.SIGNUP);
-  if (!isValid) {
+  // Verify OTP using Twilio Verify API
+  const result = await twilioVerifyService.verifyOTP(phoneNumber, otp);
+  if (!result.valid) {
     throw new ValidationError('Invalid or expired OTP');
   }
 
@@ -562,18 +556,16 @@ exports.driverForgotPassword = asyncHandler(async (req, res) => {
     throw new ValidationError('No driver found with this phone number');
   }
 
-  // Generate OTP
-  const { otpCode } = await otpService.generateOTP(phoneNumber, OTP_PURPOSE.PASSWORD_RESET);
-
-  // Send OTP via SMS
-  await smsService.sendOTP(phoneNumber, otpCode, OTP_PURPOSE.PASSWORD_RESET);
+  // Send OTP using Twilio Verify API
+  const result = await twilioVerifyService.sendOTP(phoneNumber, 'sms');
 
   res.status(200).json({
     success: true,
     message: 'OTP sent successfully for password reset',
     data: {
       phoneNumber,
-      expiresIn: '5 minutes'
+      expiresIn: '10 minutes',
+      verificationSid: result.sid
     }
   });
 });
@@ -586,9 +578,9 @@ exports.driverResetPassword = asyncHandler(async (req, res) => {
     throw new ValidationError('All fields are required');
   }
 
-  // Verify OTP
-  const isValid = await otpService.verifyOTP(phoneNumber, otp, OTP_PURPOSE.PASSWORD_RESET);
-  if (!isValid) {
+  // Verify OTP using Twilio Verify API
+  const result = await twilioVerifyService.verifyOTP(phoneNumber, otp);
+  if (!result.valid) {
     throw new ValidationError('Invalid or expired OTP');
   }
 
@@ -756,18 +748,16 @@ exports.adminLogin = asyncHandler(async (req, res) => {
     throw new AuthenticationError('Account is deactivated');
   }
 
-  // Generate OTP
-  const { otpCode } = await otpService.generateOTP(phoneNumber, OTP_PURPOSE.LOGIN);
-
-  // Send OTP via SMS
-  await smsService.sendOTP(phoneNumber, otpCode, OTP_PURPOSE.LOGIN);
+  // Send OTP using Twilio Verify API
+  const result = await twilioVerifyService.sendOTP(phoneNumber, 'sms');
 
   res.status(200).json({
     success: true,
     message: 'OTP sent successfully to your phone number',
     data: {
       phoneNumber,
-      expiresIn: '5 minutes'
+      expiresIn: '10 minutes',
+      verificationSid: result.sid
     }
   });
 });
@@ -781,9 +771,9 @@ exports.adminVerifyOTP = asyncHandler(async (req, res) => {
     throw new ValidationError('Phone number and OTP are required');
   }
 
-  // Verify OTP
-  const isValid = await otpService.verifyOTP(phoneNumber, otp, OTP_PURPOSE.LOGIN);
-  if (!isValid) {
+  // Verify OTP using Twilio Verify API
+  const result = await twilioVerifyService.verifyOTP(phoneNumber, otp);
+  if (!result.valid) {
     throw new ValidationError('Invalid or expired OTP');
   }
 

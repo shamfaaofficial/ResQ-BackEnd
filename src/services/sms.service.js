@@ -1,4 +1,4 @@
-const twilioClient = require('../config/twilio');
+const { twilioClient } = require('../config/twilio');
 const { formatQatarPhone } = require('../utils/helpers');
 
 class SMSService {
