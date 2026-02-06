@@ -40,7 +40,10 @@ cron.schedule('* * * * *', async () => {
       );
     }
 
-    // 2. Cancel bookings where payment not completed within 5 minutes of acceptance
+    // 2. DISABLED: Payment timeout logic - Not applicable for cash payments
+    // Cash flow: Driver accepts → Goes to pickup → Collects cash at the end
+    // Keeping code for reference if online payments are re-enabled in the future
+    /*
     const expiredPayments = await Booking.find({
       status: BOOKING_STATUS.ACCEPTED,
       paymentExpiresAt: { $lte: now }
@@ -80,6 +83,8 @@ cron.schedule('* * * * *', async () => {
         }
       }
     }
+    */
+    const expiredPayments = []; // Empty array since payment timeout is disabled for cash flow
 
     if (expiredRequests.length > 0 || expiredPayments.length > 0) {
       console.log(`[Booking Job] Expired ${expiredRequests.length} requests, ${expiredPayments.length} payment timeouts`);

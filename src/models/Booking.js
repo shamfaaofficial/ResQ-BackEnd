@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { BOOKING_STATUS, VEHICLE_TYPES, PAYMENT_STATUS } = require('../config/constants');
+const { BOOKING_STATUS, VEHICLE_TYPES, PAYMENT_STATUS, PAYMENT_METHOD } = require('../config/constants');
 
 const bookingSchema = new mongoose.Schema({
   bookingNumber: {
@@ -114,10 +114,14 @@ const bookingSchema = new mongoose.Schema({
       enum: Object.values(PAYMENT_STATUS),
       default: PAYMENT_STATUS.PENDING
     },
-    method: String,
+    method: {
+      type: String,
+      enum: Object.values(PAYMENT_METHOD),
+      default: PAYMENT_METHOD.CASH
+    },
     gateway: {
       type: String,
-      default: 'MyFatoorah'
+      default: null  // Only used for online payments
     },
     invoiceId: String,
     transactionId: String,
@@ -125,6 +129,11 @@ const bookingSchema = new mongoose.Schema({
     paidAt: Date,
     initiatedAt: Date,
     failedAt: Date,
+    cashCollectedAt: Date,  // When driver confirms cash collection
+    cashCollectedBy: {      // Driver ID who collected cash
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Driver'
+    },
     gatewayResponse: mongoose.Schema.Types.Mixed,
     refundStatus: String,
     refundAmount: Number,
@@ -217,7 +226,7 @@ bookingSchema.index({ requestExpiresAt: 1 }); // Keep regular index for query pe
 bookingSchema.index({ pickupLocation: '2dsphere' });
 
 // Virtual for total trip time
-bookingSchema.virtual('tripDuration').get(function() {
+bookingSchema.virtual('tripDuration').get(function () {
   if (this.timeline.completedAt && this.timeline.startedAt) {
     return Math.round((this.timeline.completedAt - this.timeline.startedAt) / 1000 / 60); // in minutes
   }
@@ -225,12 +234,12 @@ bookingSchema.virtual('tripDuration').get(function() {
 });
 
 // Method to check if booking is expired
-bookingSchema.methods.isExpired = function() {
+bookingSchema.methods.isExpired = function () {
   return this.requestExpiresAt && new Date() > this.requestExpiresAt;
 };
 
 // Method to check if payment is expired
-bookingSchema.methods.isPaymentExpired = function() {
+bookingSchema.methods.isPaymentExpired = function () {
   return this.paymentExpiresAt && new Date() > this.paymentExpiresAt;
 };
 

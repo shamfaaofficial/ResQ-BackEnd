@@ -46,6 +46,11 @@ module.exports = {
     REFUNDED: 'refunded'
   },
 
+  PAYMENT_METHOD: {
+    CASH: 'cash',
+    ONLINE: 'online'
+  },
+
   OTP_PURPOSE: {
     SIGNUP: 'signup',
     LOGIN: 'login',

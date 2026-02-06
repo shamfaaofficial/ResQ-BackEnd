@@ -153,6 +153,14 @@ router.patch(
   bookingController.startTrip
 );
 
+// Confirm cash collection (protected - driver only) - MUST be called before completing trip
+router.patch(
+  '/driver/:bookingId/collect-cash',
+  authMiddleware,
+  roleMiddleware('driver'),
+  bookingController.confirmCashCollection
+);
+
 // Complete trip (protected - driver only)
 router.patch(
   '/driver/:bookingId/complete',

@@ -367,22 +367,31 @@ exports.getUserActiveBooking = asyncHandler(async (req, res) => {
   }
   console.log('========== END GET USER ACTIVE BOOKING ==========\n');
 
-  // IMPORTANT: If payment is NOT completed, return minimal details only
-  // This prevents users from seeing trip details before payment regardless of booking status
-  const { PAYMENT_STATUS } = require('../config/constants');
+  // ============== PAYMENT FLOW HANDLING ==============
+  const { PAYMENT_METHOD, PAYMENT_STATUS } = require('../config/constants');
 
-  if (booking && booking.payment?.status !== PAYMENT_STATUS.COMPLETED) {
-    console.log('[GetUserActiveBooking] ⚠️ Payment NOT completed - returning minimal details for user');
-    console.log('[GetUserActiveBooking] Current booking status:', booking.status);
-    console.log('[GetUserActiveBooking] Current payment status:', booking.payment?.status);
+  // Determine if we should show full details or minimal details
+  // 1. If still REQUESTED, show minimal (searching for driver)
+  // 2. If ONLINE payment and PENDING, show minimal (waiting for payment)
+  // 3. If CASH payment, show full details (pay at end)
 
+  const isRequested = booking && booking.status === BOOKING_STATUS.REQUESTED;
+  const isOnlinePaymentPending = booking &&
+    booking.payment?.method === PAYMENT_METHOD.ONLINE &&
+    booking.payment?.status !== PAYMENT_STATUS.COMPLETED;
+
+  if (isRequested || isOnlinePaymentPending) {
+    if (isRequested) {
+      console.log('[GetUserActiveBooking] 🔍 Booking in REQUESTED status - waiting for driver');
+    } else {
+      console.log('[GetUserActiveBooking] 💳 Online payment PENDING - waiting for payment');
+    }
+
+    // Prepare minimal response
     const minimalResponse = {
       id: booking._id,
       bookingNumber: booking.bookingNumber,
       status: booking.status,
-      paymentStatus: booking.payment?.status || PAYMENT_STATUS.PENDING,
-      paymentUrl: booking.payment?.paymentUrl || null,
-      paymentExpiresAt: booking.paymentExpiresAt,
       pickupLocation: {
         latitude: booking.pickupLocation.coordinates[1],
         longitude: booking.pickupLocation.coordinates[0],
@@ -395,9 +404,13 @@ exports.getUserActiveBooking = asyncHandler(async (req, res) => {
         address: booking.dropoffLocation.address,
         placeName: booking.dropoffLocation.placeName
       },
-      pricing: booking.pricing, // Include pricing so user knows what to pay
-      message: 'Please complete payment to view trip details',
-      needsPayment: true
+      pricing: booking.pricing,
+      paymentMethod: booking.payment?.method || 'cash',
+      paymentStatus: booking.payment?.status,
+      paymentUrl: booking.payment?.paymentUrl,
+      paymentExpiresAt: booking.paymentExpiresAt,
+      message: isRequested ? 'Searching for a driver...' : 'Please complete payment to view trip details',
+      needsPayment: isOnlinePaymentPending
     };
 
     return res.status(200).json({
@@ -409,8 +422,10 @@ exports.getUserActiveBooking = asyncHandler(async (req, res) => {
     });
   }
 
-  // Payment completed - return full trip details
-  console.log('[GetUserActiveBooking] ✅ Payment completed or trip in progress - returning full details');
+  // Driver accepted - return full trip details with driver info
+  console.log('[GetUserActiveBooking] 💵 Cash payment flow - returning full trip details');
+  console.log('[GetUserActiveBooking] Booking status:', booking?.status);
+  console.log('[GetUserActiveBooking] Payment method:', booking?.payment?.method);
 
   // If booking exists with driver, fetch real-time driver location and generate signed URL for profile image
   let driverCurrentLocation = null;
@@ -456,7 +471,11 @@ exports.getUserActiveBooking = asyncHandler(async (req, res) => {
       longitude: booking.dropoffLocation.coordinates[0],
       address: booking.dropoffLocation.address,
       placeName: booking.dropoffLocation.placeName
-    }
+    },
+    // Add cash payment info for user
+    paymentMethod: booking.payment?.method || 'cash',
+    cashPaymentRequired: booking.payment?.method === 'cash' && booking.payment?.status !== 'completed',
+    amountToPay: booking.pricing?.totalAmount
   } : null;
 
   res.status(200).json({
@@ -561,14 +580,16 @@ exports.getBookingLiveStatus = asyncHandler(async (req, res) => {
     });
   }
 
-  // IMPORTANT: If payment is NOT completed, return minimal details
-  // This prevents users from seeing trip details before payment regardless of booking status
-  const { PAYMENT_STATUS } = require('../config/constants');
+  // ============== PAYMENT FLOW HANDLING ==============
+  const { PAYMENT_METHOD, PAYMENT_STATUS } = require('../config/constants');
 
-  if (booking.payment?.status !== PAYMENT_STATUS.COMPLETED) {
-    console.log('[GetBookingLiveStatus] ⚠️ Payment NOT completed - returning minimal details');
-    console.log('[GetBookingLiveStatus] Current booking status:', booking.status);
-    console.log('[GetBookingLiveStatus] Current payment status:', booking.payment?.status);
+  // If usage is online payment and pending, don't show live driver location
+  // For CASH payment, we show full details immediately
+  const isOnlinePaymentPending = booking.payment?.method === PAYMENT_METHOD.ONLINE &&
+    booking.payment?.status !== PAYMENT_STATUS.COMPLETED;
+
+  if (isOnlinePaymentPending) {
+    console.log('[GetBookingLiveStatus] 💳 Online payment PENDING - returning minimal details');
 
     return res.status(200).json({
       success: true,
@@ -591,8 +612,7 @@ exports.getBookingLiveStatus = asyncHandler(async (req, res) => {
     });
   }
 
-  // Payment completed - proceed with full details
-  console.log('[GetBookingLiveStatus] ✅ Payment completed - returning full trip details');
+  console.log('[GetBookingLiveStatus] ✅ Payment verified or Cash flow - showing full trip details');
 
   // Get driver details
   const driver = await Driver.findById(booking.driverId);
@@ -1276,12 +1296,36 @@ exports.acceptBooking = asyncHandler(async (req, res) => {
   driver.isBusy = true;
   await driver.save();
 
-  // Set payment expiry after acceptance (user should pay within 5 minutes)
-  booking.paymentExpiresAt = new Date(Date.now() + PAYMENT_TIMEOUT_SECONDS * 1000);
+  // ============== CASH PAYMENT FLOW ==============
+  // Since we're using cash payments, skip the payment waiting period
+  // Driver proceeds directly to pickup after accepting
+  // Payment will be collected as cash at the end of the trip
+
+  // Set payment method to CASH
+  const { PAYMENT_METHOD } = require('../config/constants');
+  booking.payment.method = PAYMENT_METHOD.CASH;
+
+  // Keep status as ACCEPTED (NOT payment_completed - that would be semantically wrong)
+  // The payment.method = 'cash' field tells the system to allow proceeding without online payment
+  // Booking status: ACCEPTED means driver accepted and is going to pickup
+  // We do NOT change to payment_completed because user hasn't paid yet
+
+  // Generate verification code now (will be used when driver arrives)
+  const verificationCode = Math.floor(1000 + Math.random() * 9000).toString();
+  booking.verificationCode = {
+    code: verificationCode,
+    generatedAt: new Date(),
+    isVerified: false
+  };
+
+  // No payment expiry needed for cash flow
+  // booking.paymentExpiresAt = new Date(Date.now() + PAYMENT_TIMEOUT_SECONDS * 1000);
+  // ================================================
 
   await booking.save();
   console.log('[AcceptBooking] ✅ Booking saved with status:', booking.status);
-  console.log('[AcceptBooking] ⏳ Payment expires at:', booking.paymentExpiresAt);
+  console.log('[AcceptBooking] 💵 Payment method: CASH - Driver proceeds to pickup immediately');
+  console.log('[AcceptBooking] 🔢 Verification code generated:', verificationCode);
   console.log('[AcceptBooking] ✅ Booking ID:', booking._id);
   console.log('[AcceptBooking] ✅ Driver ID:', booking.driverId);
 
@@ -1313,7 +1357,7 @@ exports.acceptBooking = asyncHandler(async (req, res) => {
     await notificationService.sendNotification(
       booking.userId._id,
       'Booking Accepted',
-      `${driverName} accepted your booking. Please complete payment to proceed.`,
+      `${driverName} accepted your booking and is on the way! Pay by cash at the end of your trip.`,
       'booking_accepted',
       { bookingId: booking._id }
     );
@@ -1323,24 +1367,42 @@ exports.acceptBooking = asyncHandler(async (req, res) => {
     // Don't fail the booking acceptance if notification fails
   }
 
-  // IMPORTANT: DO NOT emit socket event with trip details until payment is completed
-  // Only notify that booking status changed to "accepted"
-  console.log('[AcceptBooking] ⚠️ NOT emitting full trip details - waiting for payment completion');
+  // Emit Socket.IO event for real-time update - driver is now on the way
+  try {
+    emitBookingUpdate(booking);
+    console.log('[AcceptBooking] ✅ Socket event emitted - user can now track driver');
+  } catch (error) {
+    console.error('[AcceptBooking] Failed to emit socket event:', error.message);
+  }
 
-  // Prepare minimal response - NO trip details until payment completed
-  const minimalResponse = {
+  // Prepare full response - driver details included since they're on their way
+  const bookingResponse = {
     id: booking._id,
     bookingNumber: booking.bookingNumber,
     status: booking.status,
-    paymentExpiresAt: booking.paymentExpiresAt,
-    message: 'Booking accepted. Waiting for user to complete payment.'
+    paymentMethod: booking.payment.method,
+    verificationCode: booking.verificationCode.code, // Driver needs this to verify at pickup
+    pickupLocation: {
+      latitude: booking.pickupLocation.coordinates[1],
+      longitude: booking.pickupLocation.coordinates[0],
+      address: booking.pickupLocation.address,
+      placeName: booking.pickupLocation.placeName
+    },
+    // Note: dropoffLocation is hidden until trip starts (handled in getDriverActiveBooking)
+    pricing: booking.pricing,
+    user: {
+      phoneNumber: booking.userId?.phoneNumber,
+      firstName: booking.userId?.profile?.firstName,
+      lastName: booking.userId?.profile?.lastName
+    },
+    message: 'Booking accepted. Proceed to pickup location. Collect cash payment at the end of the trip.'
   };
 
   res.status(200).json({
     success: true,
-    message: 'Booking accepted successfully. Waiting for payment.',
+    message: 'Booking accepted successfully. Proceed to pickup location.',
     data: {
-      booking: minimalResponse
+      booking: bookingResponse
     }
   });
 });
@@ -1373,34 +1435,24 @@ exports.getDriverActiveBooking = asyncHandler(async (req, res) => {
     });
   }
 
-  // IMPORTANT: If payment is NOT completed, return minimal details only
-  if (booking.status === BOOKING_STATUS.ACCEPTED && booking.payment?.status !== PAYMENT_STATUS.COMPLETED) {
-    console.log('[GetDriverActiveBooking] ⚠️ Payment NOT completed - returning minimal details');
-    const minimalResponse = {
-      id: booking._id,
-      bookingNumber: booking.bookingNumber,
-      status: booking.status,
-      paymentStatus: booking.payment?.status || PAYMENT_STATUS.PENDING,
-      paymentExpiresAt: booking.paymentExpiresAt,
-      message: 'Waiting for user to complete payment'
-    };
+  // ============== CASH PAYMENT FLOW ==============
+  // For cash flow, we always return full trip details since payment happens at the end
+  // The booking status is set to PAYMENT_COMPLETED upon acceptance, allowing driver to proceed
+  console.log('[GetDriverActiveBooking] 💵 Cash payment flow - returning full trip details');
+  console.log('[GetDriverActiveBooking] Booking status:', booking.status);
+  console.log('[GetDriverActiveBooking] Payment method:', booking.payment?.method);
 
-    return res.status(200).json({
-      success: true,
-      data: {
-        booking: minimalResponse
-      }
-    });
-  }
-
-  // Payment completed - return full trip details
-  console.log('[GetDriverActiveBooking] ✅ Payment completed - returning full trip details');
   const bookingResponse = booking.toObject();
 
   // Hide dropoff location until trip starts (IN_PROGRESS status)
   if (booking.status !== BOOKING_STATUS.IN_PROGRESS && booking.status !== BOOKING_STATUS.COMPLETED) {
     delete bookingResponse.dropoffLocation;
   }
+
+  // Add cash collection info for driver
+  bookingResponse.paymentMethod = booking.payment?.method || 'cash';
+  bookingResponse.cashCollectionRequired = booking.payment?.method === 'cash' && booking.payment?.status !== 'completed';
+  bookingResponse.amountToCollect = booking.pricing?.totalAmount;
 
   res.status(200).json({
     success: true,
@@ -1424,7 +1476,25 @@ exports.markDriverArrived = asyncHandler(async (req, res) => {
     throw new NotFoundError('Booking not found');
   }
 
-  if (booking.status !== BOOKING_STATUS.PAYMENT_COMPLETED) {
+  // Check if valid state to proceed
+  const { PAYMENT_METHOD } = require('../config/constants');
+
+  // Allow if:
+  // 1. Online payment completed (status is PAYMENT_COMPLETED)
+  // 2. Cash payment accepted (status is ACCEPTED and method is CASH)
+  const isOnlinePaymentCompleted = booking.status === BOOKING_STATUS.PAYMENT_COMPLETED;
+  const isCashPaymentAccepted = booking.status === BOOKING_STATUS.ACCEPTED && booking.payment?.method === PAYMENT_METHOD.CASH;
+
+  if (!isOnlinePaymentCompleted && !isCashPaymentAccepted) {
+    // If it's a cash booking but not accepted (e.g. still requested), or online booking not paid
+    if (booking.status === BOOKING_STATUS.REQUESTED) {
+      throw new ValidationError('Booking must be accepted first');
+    }
+
+    if (booking.payment?.method === PAYMENT_METHOD.CASH && booking.status !== BOOKING_STATUS.ACCEPTED) {
+      throw new ValidationError('Cash booking must be in ACCEPTED state');
+    }
+
     throw new ValidationError('Payment must be completed before driver can mark arrival');
   }
 
@@ -1454,7 +1524,7 @@ exports.markDriverArrived = asyncHandler(async (req, res) => {
   await notificationService.sendNotification(
     booking.userId._id,
     'Driver Arrived',
-    `Your driver has arrived! Your verification code is: ${verificationCode}`,
+    `Your driver has arrived! Share verification code ${verificationCode} with your driver. Remember: Pay by cash at the end of your trip.`,
     'driver_arrived',
     { bookingId: booking._id, verificationCode }
   );
@@ -1656,6 +1726,18 @@ exports.completeTrip = asyncHandler(async (req, res) => {
     throw new ValidationError('Trip must be in progress to complete');
   }
 
+  // ============== CASH PAYMENT FLOW ==============
+  // For cash payments, verify that cash has been collected before completing trip
+  const { PAYMENT_METHOD, PAYMENT_STATUS } = require('../config/constants');
+
+  if (booking.payment?.method === PAYMENT_METHOD.CASH) {
+    if (booking.payment?.status !== PAYMENT_STATUS.COMPLETED) {
+      throw new ValidationError('Please confirm cash collection before completing the trip. Use the "Collect Cash" button first.');
+    }
+    console.log('[CompleteTrip] ✅ Cash collection verified - payment status:', booking.payment.status);
+  }
+  // ================================================
+
   // Update actual dropoff location if provided
   if (actualDropoffLocation?.coordinates) {
     booking.actualDropoffLocation = {
@@ -1794,6 +1876,103 @@ exports.completeTrip = asyncHandler(async (req, res) => {
   });
 });
 
+// ============== CASH PAYMENT FLOW ==============
+// Confirm cash collection by driver (must be called before completing trip)
+exports.confirmCashCollection = asyncHandler(async (req, res) => {
+  const { bookingId } = req.params;
+  const { amountCollected } = req.body;
+
+  console.log('\n========== CONFIRM CASH COLLECTION ==========');
+  console.log('[ConfirmCashCollection] Booking ID:', bookingId);
+  console.log('[ConfirmCashCollection] Driver User ID:', req.userId);
+  console.log('[ConfirmCashCollection] Amount collected:', amountCollected);
+
+  const driver = await Driver.findOne({ userId: req.userId });
+  if (!driver) {
+    throw new NotFoundError('Driver profile not found');
+  }
+
+  const booking = await Booking.findOne({
+    _id: bookingId,
+    driverId: driver._id
+  });
+
+  if (!booking) {
+    throw new NotFoundError('Booking not found');
+  }
+
+  // Verify booking is in a valid state for cash collection
+  if (booking.status !== BOOKING_STATUS.IN_PROGRESS) {
+    throw new ValidationError('Cash can only be collected when trip is in progress');
+  }
+
+  // Verify payment method is cash
+  const { PAYMENT_METHOD, PAYMENT_STATUS } = require('../config/constants');
+  if (booking.payment?.method !== PAYMENT_METHOD.CASH) {
+    throw new ValidationError('This booking is not a cash payment');
+  }
+
+  // Verify amount collected matches expected amount (with 1 QAR tolerance for rounding)
+  const expectedAmount = booking.pricing.totalAmount;
+  const collectedAmount = parseFloat(amountCollected) || 0;
+
+  if (Math.abs(collectedAmount - expectedAmount) > 1) {
+    console.log('[ConfirmCashCollection] ⚠️ Amount mismatch - Expected:', expectedAmount, 'Collected:', collectedAmount);
+    throw new ValidationError(`Amount mismatch. Expected: ${expectedAmount} ${booking.pricing.currency}, Collected: ${collectedAmount} ${booking.pricing.currency}`);
+  }
+
+  // Update payment status
+  booking.payment.status = PAYMENT_STATUS.COMPLETED;
+  booking.payment.paidAmount = collectedAmount;
+  booking.payment.paidAt = new Date();
+  booking.payment.cashCollectedAt = new Date();
+  booking.payment.cashCollectedBy = driver._id;
+
+  await booking.save();
+
+  console.log('[ConfirmCashCollection] ✅ Cash collection confirmed');
+  console.log('[ConfirmCashCollection] Amount:', collectedAmount, booking.pricing.currency);
+  console.log('[ConfirmCashCollection] Payment status updated to:', booking.payment.status);
+  console.log('========== END CONFIRM CASH COLLECTION ==========\n');
+
+  // Populate for response
+  await booking.populate('userId', 'phoneNumber profile');
+
+  // Send notification to user confirming payment received
+  try {
+    await notificationService.sendNotification(
+      booking.userId._id,
+      'Payment Received',
+      `Your cash payment of ${collectedAmount} ${booking.pricing.currency} has been received. Thank you!`,
+      'payment_received',
+      { bookingId: booking._id, amount: collectedAmount, currency: booking.pricing.currency }
+    );
+    console.log('[ConfirmCashCollection] Payment confirmation notification sent to user');
+  } catch (notifError) {
+    console.error('[ConfirmCashCollection] Failed to send notification:', notifError.message);
+  }
+
+  // Emit Socket.IO event for real-time update
+  try {
+    emitBookingUpdate(booking);
+  } catch (error) {
+    console.error('[ConfirmCashCollection] Failed to emit socket event:', error.message);
+  }
+
+  res.status(200).json({
+    success: true,
+    message: 'Cash payment confirmed successfully. You can now complete the trip.',
+    data: {
+      bookingId: booking._id,
+      bookingNumber: booking.bookingNumber,
+      amountCollected: collectedAmount,
+      currency: booking.pricing.currency,
+      paymentStatus: booking.payment.status,
+      cashCollectedAt: booking.payment.cashCollectedAt,
+      canCompleteTrip: true
+    }
+  });
+});
 // Cancel booking by driver
 exports.cancelBookingByDriver = asyncHandler(async (req, res) => {
   const { bookingId } = req.params;
