@@ -1677,14 +1677,14 @@ exports.startTrip = asyncHandler(async (req, res) => {
     throw new NotFoundError('Booking not found');
   }
 
-  if (booking.status !== BOOKING_STATUS.DRIVER_ARRIVED) {
-    throw new ValidationError('Driver must arrive at pickup before starting trip');
-  }
+  // if (booking.status !== BOOKING_STATUS.DRIVER_ARRIVED) {
+  //   throw new ValidationError('Driver must arrive at pickup before starting trip');
+  // }
 
   // Check if verification code is verified
-  if (!booking.verificationCode?.isVerified) {
-    throw new ValidationError('You must verify the pickup code before starting trip');
-  }
+  // if (!booking.verificationCode?.isVerified) {
+  //   throw new ValidationError('You must verify the pickup code before starting trip');
+  // }
 
   booking.status = BOOKING_STATUS.IN_PROGRESS;
   booking.timeline.startedAt = new Date();
