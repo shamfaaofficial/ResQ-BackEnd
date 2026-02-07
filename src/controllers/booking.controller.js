@@ -1731,10 +1731,31 @@ exports.completeTrip = asyncHandler(async (req, res) => {
   const { PAYMENT_METHOD, PAYMENT_STATUS } = require('../config/constants');
 
   if (booking.payment?.method === PAYMENT_METHOD.CASH) {
+    // MODIFIED: Auto-complete cash payment instead of requiring manual confirmation
     if (booking.payment?.status !== PAYMENT_STATUS.COMPLETED) {
-      throw new ValidationError('Please confirm cash collection before completing the trip. Use the "Collect Cash" button first.');
+      console.log('[CompleteTrip] ⚠️ Cash payment pending - Auto-completing payment...');
+
+      const totalAmount = booking.pricing.totalAmount;
+      booking.payment.status = PAYMENT_STATUS.COMPLETED;
+      booking.payment.paidAmount = totalAmount;
+      booking.payment.paidAt = new Date();
+      booking.payment.cashCollectedAt = new Date();
+      booking.payment.cashCollectedBy = driver._id;
+
+      // Notify user about auto-payment (optional, but good for records)
+      try {
+        await notificationService.sendNotification(
+          booking.userId,
+          'Payment Received',
+          `Cash payment of ${totalAmount} ${booking.pricing.currency} collected via trip completion.`,
+          'payment_received',
+          { bookingId: booking._id, amount: totalAmount, currency: booking.pricing.currency }
+        );
+      } catch (err) {
+        console.error('[CompleteTrip] Failed to send payment notification:', err.message);
+      }
     }
-    console.log('[CompleteTrip] ✅ Cash collection verified - payment status:', booking.payment.status);
+    console.log('[CompleteTrip] ✅ Cash collection verified or auto-completed - payment status:', booking.payment.status);
   }
   // ================================================
 
