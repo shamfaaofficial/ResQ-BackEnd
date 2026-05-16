@@ -4,7 +4,7 @@ const Driver = require('../models/Driver');
 const otpService = require('../services/otp.service');
 const smsService = require('../services/sms.service');
 const twilioVerifyService = require('../services/twilioVerify.service');
-const { generateAccessToken, generateRefreshToken, hashPassword, comparePassword, cleanPhoneNumber } = require('../utils/helpers');
+const { generateAccessToken, generateRefreshToken, hashPassword, comparePassword, cleanPhoneNumber, formatQatarPhone } = require('../utils/helpers');
 const { ValidationError, AuthenticationError } = require('../utils/errors');
 const { OTP_PURPOSE } = require('../config/constants');
 
@@ -14,7 +14,8 @@ const { OTP_PURPOSE } = require('../config/constants');
 
 // Send OTP for user signup
 exports.userSignup = asyncHandler(async (req, res) => {
-  const { phoneNumber } = req.body;
+  let { phoneNumber } = req.body;
+  phoneNumber = formatQatarPhone(cleanPhoneNumber(phoneNumber));
 
   if (!phoneNumber) {
     throw new ValidationError('Phone number is required');
@@ -79,7 +80,8 @@ exports.userVerifyOTP = asyncHandler(async (req, res) => {
 
 // Complete user signup after OTP verification
 exports.userCompleteSignup = asyncHandler(async (req, res) => {
-  const { phoneNumber, password, firstName, lastName } = req.body;
+  let { phoneNumber, password, firstName, lastName } = req.body;
+  phoneNumber = formatQatarPhone(cleanPhoneNumber(phoneNumber));
 
   // Validate required fields
   if (!phoneNumber || !password || !firstName) {
@@ -135,7 +137,8 @@ exports.userCompleteSignup = asyncHandler(async (req, res) => {
 
 // User login
 exports.userLogin = asyncHandler(async (req, res) => {
-  const { phoneNumber, password } = req.body;
+  let { phoneNumber, password } = req.body;
+  phoneNumber = formatQatarPhone(cleanPhoneNumber(phoneNumber));
 
   if (!phoneNumber || !password) {
     throw new ValidationError('Phone number and password are required');
@@ -184,7 +187,8 @@ exports.userLogin = asyncHandler(async (req, res) => {
 
 // Forgot password - send OTP
 exports.userForgotPassword = asyncHandler(async (req, res) => {
-  const { phoneNumber } = req.body;
+  let { phoneNumber } = req.body;
+  phoneNumber = formatQatarPhone(cleanPhoneNumber(phoneNumber));
 
   if (!phoneNumber) {
     throw new ValidationError('Phone number is required');
@@ -317,7 +321,8 @@ exports.createGuestSession = asyncHandler(async (req, res) => {
 
 // Send OTP for driver signup
 exports.driverSignup = asyncHandler(async (req, res) => {
-  const { phoneNumber } = req.body;
+  let { phoneNumber } = req.body;
+  phoneNumber = formatQatarPhone(cleanPhoneNumber(phoneNumber));
 
   if (!phoneNumber) {
     throw new ValidationError('Phone number is required');
@@ -370,7 +375,8 @@ exports.driverVerifyOTP = asyncHandler(async (req, res) => {
 
 // Complete driver signup after OTP verification
 exports.driverCompleteSignup = asyncHandler(async (req, res) => {
-  const { phoneNumber, password, firstName, lastName } = req.body;
+  let { phoneNumber, password, firstName, lastName } = req.body;
+  phoneNumber = formatQatarPhone(cleanPhoneNumber(phoneNumber));
 
   // Validate required fields
   if (!phoneNumber || !password || !firstName) {
@@ -487,7 +493,8 @@ exports.driverCompleteSignup = asyncHandler(async (req, res) => {
 
 // Driver login
 exports.driverLogin = asyncHandler(async (req, res) => {
-  const { phoneNumber, password } = req.body;
+  let { phoneNumber, password } = req.body;
+  phoneNumber = formatQatarPhone(cleanPhoneNumber(phoneNumber));
 
   if (!phoneNumber || !password) {
     throw new ValidationError('Phone number and password are required');
@@ -544,7 +551,8 @@ exports.driverLogin = asyncHandler(async (req, res) => {
 
 // Forgot password - send OTP
 exports.driverForgotPassword = asyncHandler(async (req, res) => {
-  const { phoneNumber } = req.body;
+  let { phoneNumber } = req.body;
+  phoneNumber = formatQatarPhone(cleanPhoneNumber(phoneNumber));
 
   if (!phoneNumber) {
     throw new ValidationError('Phone number is required');
@@ -731,7 +739,8 @@ exports.driverSubmitDocuments = asyncHandler(async (req, res) => {
 
 // Send OTP for admin login
 exports.adminLogin = asyncHandler(async (req, res) => {
-  const { phoneNumber } = req.body;
+  let { phoneNumber } = req.body;
+  phoneNumber = formatQatarPhone(cleanPhoneNumber(phoneNumber));
 
   if (!phoneNumber) {
     throw new ValidationError('Phone number is required');
@@ -944,28 +953,33 @@ exports.removeFcmToken = asyncHandler(async (req, res) => {
 exports.forgotPasswordRequest = asyncHandler(async (req, res) => {
   let { phoneNumber, role } = req.body;
 
-  if (!phoneNumber || !role) {
-    throw new ValidationError('Phone number and role are required');
-  }
-
-  // Clean phone number - remove invisible Unicode characters and whitespace
-  phoneNumber = cleanPhoneNumber(phoneNumber);
-  console.log('🧹 Cleaned phone number:', phoneNumber);
+  // Clean and normalize phone number
+  phoneNumber = formatQatarPhone(cleanPhoneNumber(phoneNumber));
+  
+  console.log('🧹 Normalized phone number:', phoneNumber);
 
   if (!['user', 'driver'].includes(role)) {
     throw new ValidationError('Role must be either "user" or "driver"');
   }
 
   // Check if user/driver exists
-  let userExists;
-  if (role === 'driver') {
-    userExists = await User.findOne({ phoneNumber, role: 'driver' });
-  } else {
-    userExists = await User.findOne({ phoneNumber, role: 'user' });
-  }
+  const userExists = await User.findOne({ phoneNumber });
 
   if (!userExists) {
     throw new ValidationError('No account found with this phone number');
+  }
+
+  // Use the phone number as stored in the database for consistency in the rest of the flow
+  phoneNumber = userExists.phoneNumber;
+
+  // Check if the role matches
+  if (userExists.role !== role) {
+    throw new ValidationError(`Account found but it is registered as a ${userExists.role}. Please use the correct application.`);
+  }
+
+  // Check if account is active
+  if (!userExists.isActive) {
+    throw new ValidationError('Your account has been deactivated. Please contact support.');
   }
 
   // Generate OTP
@@ -992,8 +1006,8 @@ exports.forgotPasswordVerifyOTP = asyncHandler(async (req, res) => {
     throw new ValidationError('Phone number and OTP are required');
   }
 
-  // Clean phone number
-  phoneNumber = cleanPhoneNumber(phoneNumber);
+  // Clean and normalize phone number
+  phoneNumber = formatQatarPhone(cleanPhoneNumber(phoneNumber));
 
   // Verify OTP
   await otpService.verifyOTP(phoneNumber, otp, OTP_PURPOSE.PASSWORD_RESET);
@@ -1012,12 +1026,12 @@ exports.forgotPasswordVerifyOTP = asyncHandler(async (req, res) => {
 exports.forgotPasswordReset = asyncHandler(async (req, res) => {
   let { phoneNumber, otp, newPassword, role } = req.body;
 
-  if (!phoneNumber || !otp || !newPassword || !role) {
-    throw new ValidationError('Phone number, OTP, new password, and role are required');
+  if (!phoneNumber || !otp || !newPassword) {
+    throw new ValidationError('All fields are required');
   }
 
-  // Clean phone number
-  phoneNumber = cleanPhoneNumber(phoneNumber);
+  // Clean and normalize phone number
+  phoneNumber = formatQatarPhone(cleanPhoneNumber(phoneNumber));
 
   if (!['user', 'driver'].includes(role)) {
     throw new ValidationError('Role must be either "user" or "driver"');
