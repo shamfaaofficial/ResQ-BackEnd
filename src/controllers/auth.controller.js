@@ -739,8 +739,7 @@ exports.driverSubmitDocuments = asyncHandler(async (req, res) => {
 
 // Send OTP for admin login
 exports.adminLogin = asyncHandler(async (req, res) => {
-  let { phoneNumber } = req.body;
-  phoneNumber = formatQatarPhone(cleanPhoneNumber(phoneNumber));
+  const { phoneNumber } = req.body;
 
   if (!phoneNumber) {
     throw new ValidationError('Phone number is required');
