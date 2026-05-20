@@ -25,6 +25,16 @@ exports.getDocumentRequirements = asyncHandler(async (req, res) => {
         description: 'Valid vehicle registration document',
         acceptedFormats: ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'],
         maxSize: '5MB'
+      },
+      {
+        type: 'vehicle_image',
+        name: 'Vehicle Image',
+        description: 'Clear photo of the vehicle',
+        acceptedFormats: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
+        maxSize: '5MB',
+        extraFields: [
+          { name: 'vehicleType', type: 'string', required: true, description: 'Type of vehicle (small_car, sedan, suv, truck, heavy_vehicle)' }
+        ]
       }
     ]
   };
@@ -107,46 +117,69 @@ exports.getMyDocuments = asyncHandler(async (req, res) => {
  */
 exports.uploadDocument = asyncHandler(async (req, res) => {
   const driverId = req.userId;
-  const { documentType } = req.body;
+  const { documentType, vehicleType } = req.body;
 
-  // Validate document type - only license and registration are required
-  const validTypes = ['license', 'registration'];
-  if (!documentType || !validTypes.includes(documentType)) {
-    throw new ValidationError('Invalid document type. Only "license" and "registration" are allowed');
+  const validDocTypes = ['license', 'registration', 'vehicle_image'];
+  if (!documentType || !validDocTypes.includes(documentType)) {
+    throw new ValidationError('Invalid document type. Must be "license", "registration", or "vehicle_image"');
   }
 
-  // Check if file was uploaded
   if (!req.file) {
     throw new ValidationError('No file uploaded');
   }
 
-  // Get driver
   const driver = await Driver.findOne({ userId: driverId });
   if (!driver) {
     throw new NotFoundError('Driver profile not found');
   }
 
-  // Generate unique filename
+  // vehicleType is required when uploading a vehicle image
+  if (documentType === 'vehicle_image') {
+    if (!vehicleType) {
+      throw new ValidationError('vehicleType is required when uploading a vehicle image');
+    }
+    const { VEHICLE_TYPES } = require('../config/constants');
+    if (!Object.values(VEHICLE_TYPES).includes(vehicleType)) {
+      throw new ValidationError(`Invalid vehicle type. Must be one of: ${Object.values(VEHICLE_TYPES).join(', ')}`);
+    }
+    driver.vehicleDetails.vehicleType = vehicleType;
+  }
+
   const fileExtension = path.extname(req.file.originalname);
   const s3FileName = `drivers/${driver._id}/${documentType}_${Date.now()}${fileExtension}`;
-
-  // Upload to S3
   const s3Url = await uploadToS3(req.file.buffer, s3FileName, req.file.mimetype);
 
-  // Check if document type already exists
+  // Vehicle image goes into vehicleDetails.vehicleImages, not documents array
+  if (documentType === 'vehicle_image') {
+    driver.vehicleDetails.vehicleImages.push(s3Url);
+    await driver.save();
+
+    const signedUrl = await getSignedFileUrl(s3FileName, 3600);
+
+    return res.status(201).json({
+      success: true,
+      message: 'Vehicle image uploaded successfully',
+      data: {
+        type: 'vehicle_image',
+        url: s3Url,
+        signedUrl,
+        uploadedAt: new Date(),
+        vehicleType: driver.vehicleDetails.vehicleType || null
+      }
+    });
+  }
+
+  // license / registration flow
   const existingDocIndex = driver.documents.findIndex(doc => doc.type === documentType);
 
   if (existingDocIndex !== -1) {
-    // Delete old file from S3
     try {
       const oldS3Key = extractS3Key(driver.documents[existingDocIndex].url);
       await deleteFromS3(oldS3Key);
     } catch (error) {
       console.error('Failed to delete old S3 file:', error);
-      // Continue even if deletion fails
     }
 
-    // Update existing document
     driver.documents[existingDocIndex] = {
       type: documentType,
       url: s3Url,
@@ -155,7 +188,6 @@ exports.uploadDocument = asyncHandler(async (req, res) => {
       fileName: req.file.originalname,
       fileSize: req.file.size,
       mimeType: req.file.mimetype,
-      // Clear previous review data
       verifiedAt: undefined,
       rejectionReason: undefined,
       adminComments: undefined,
@@ -163,7 +195,6 @@ exports.uploadDocument = asyncHandler(async (req, res) => {
       reviewedAt: undefined
     };
   } else {
-    // Add new document
     driver.documents.push({
       type: documentType,
       url: s3Url,
@@ -177,7 +208,6 @@ exports.uploadDocument = asyncHandler(async (req, res) => {
 
   await driver.save();
 
-  // Generate signed URL for response
   const signedUrl = await getSignedFileUrl(s3FileName, 3600);
 
   res.status(201).json({

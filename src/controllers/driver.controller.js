@@ -700,4 +700,19 @@ exports.getRideHistory = asyncHandler(async (req, res) => {
   });
 });
 
+// Get tow service types dropdown
+exports.getServiceTypes = asyncHandler(async (req, res) => {
+  const serviceTypes = [
+    { value: 'standard_tow', label: 'Standard Tow' },
+    { value: 'full_down_tow', label: 'Full-down Tow' },
+    { value: 'covered_car_transport', label: 'Covered Car Transport' },
+    { value: 'roadside_assistance', label: 'Roadside Assistance' }
+  ];
+
+  res.status(200).json({
+    success: true,
+    data: { serviceTypes }
+  });
+});
+
 module.exports = exports;

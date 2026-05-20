@@ -27,6 +27,11 @@ const upload = multer({
   }
 });
 
+// Public routes (no auth required)
+
+// Get tow service types for dropdowns
+router.get('/service-types', driverController.getServiceTypes);
+
 // All routes are protected and require driver role
 
 // Get driver profile

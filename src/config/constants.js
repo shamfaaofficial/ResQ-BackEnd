@@ -84,6 +84,13 @@ module.exports = {
     ADMIN_MESSAGE: 'admin_message'
   },
 
+  TOW_SERVICE_TYPES: {
+    STANDARD_TOW: 'standard_tow',
+    FULL_DOWN_TOW: 'full_down_tow',
+    COVERED_CAR_TRANSPORT: 'covered_car_transport',
+    ROADSIDE_ASSISTANCE: 'roadside_assistance'
+  },
+
   QATAR_COUNTRY_CODE: '+974',
 
   OTP_EXPIRY_MINUTES: 5,
