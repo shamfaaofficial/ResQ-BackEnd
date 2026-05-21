@@ -86,9 +86,8 @@ module.exports = {
 
   TOW_SERVICE_TYPES: {
     STANDARD_TOW: 'standard_tow',
-    FULL_DOWN_TOW: 'full_down_tow',
-    COVERED_CAR_TRANSPORT: 'covered_car_transport',
-    ROADSIDE_ASSISTANCE: 'roadside_assistance'
+    COMFORT_TOW: 'comfort_tow',
+    LUXURY_TRANSPORT: 'luxury_transport'
   },
 
   QATAR_COUNTRY_CODE: '+974',

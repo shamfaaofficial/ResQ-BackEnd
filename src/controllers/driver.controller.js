@@ -704,9 +704,8 @@ exports.getRideHistory = asyncHandler(async (req, res) => {
 exports.getServiceTypes = asyncHandler(async (req, res) => {
   const serviceTypes = [
     { value: 'standard_tow', label: 'Standard Tow' },
-    { value: 'full_down_tow', label: 'Full-down Tow' },
-    { value: 'covered_car_transport', label: 'Covered Car Transport' },
-    { value: 'roadside_assistance', label: 'Roadside Assistance' }
+    { value: 'comfort_tow', label: 'Comfort Tow (Fulldown)' },
+    { value: 'luxury_transport', label: 'Luxury Transport (Enclosed)' }
   ];
 
   res.status(200).json({
