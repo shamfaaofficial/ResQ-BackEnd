@@ -31,10 +31,7 @@ exports.getDocumentRequirements = asyncHandler(async (req, res) => {
         name: 'Vehicle Image',
         description: 'Clear photo of the vehicle',
         acceptedFormats: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
-        maxSize: '5MB',
-        extraFields: [
-          { name: 'vehicleType', type: 'string', required: true, description: 'Type of vehicle (standard_tow, comfort_tow, luxury_transport)' }
-        ]
+        maxSize: '5MB'
       }
     ]
   };
@@ -131,18 +128,6 @@ exports.uploadDocument = asyncHandler(async (req, res) => {
   const driver = await Driver.findOne({ userId: driverId });
   if (!driver) {
     throw new NotFoundError('Driver profile not found');
-  }
-
-  // vehicleType is required when uploading a vehicle image
-  if (documentType === 'vehicle_image') {
-    if (!vehicleType) {
-      throw new ValidationError('vehicleType is required when uploading a vehicle image');
-    }
-    const { VEHICLE_TYPES } = require('../config/constants');
-    if (!Object.values(VEHICLE_TYPES).includes(vehicleType)) {
-      throw new ValidationError(`Invalid vehicle type. Must be one of: ${Object.values(VEHICLE_TYPES).join(', ')}`);
-    }
-    driver.vehicleDetails.vehicleType = vehicleType;
   }
 
   const fileExtension = path.extname(req.file.originalname);
