@@ -46,7 +46,7 @@ const driverSchema = new mongoose.Schema({
   documents: [{
     type: {
       type: String,
-      enum: ['license', 'registration']
+      enum: ['license', 'registration', 'vehicle_image']
     },
     url: {
       type: String

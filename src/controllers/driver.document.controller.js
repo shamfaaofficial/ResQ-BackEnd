@@ -51,7 +51,7 @@ exports.getMyDocuments = asyncHandler(async (req, res) => {
   const driverId = req.userId;
 
   const driver = await Driver.findOne({ userId: driverId })
-    .select('documents approvalStatus adminComments reviewedBy reviewedAt')
+    .select('documents approvalStatus adminComments reviewedBy reviewedAt vehicleDetails')
     .populate('reviewedBy', 'profile.firstName profile.lastName');
 
   if (!driver) {
@@ -92,6 +92,32 @@ exports.getMyDocuments = asyncHandler(async (req, res) => {
       };
     })
   );
+
+  // Fallback for vehicle_image if not in documents array but exists in vehicleImages
+  const hasVehicleImageDoc = driver.documents.some(doc => doc.type === 'vehicle_image');
+  if (!hasVehicleImageDoc && driver.vehicleDetails && driver.vehicleDetails.vehicleImages && driver.vehicleDetails.vehicleImages.length > 0) {
+    const vehicleImageUrl = driver.vehicleDetails.vehicleImages[driver.vehicleDetails.vehicleImages.length - 1]; // get latest
+    let signedUrl = null;
+    if (vehicleImageUrl) {
+      try {
+        const s3Key = extractS3Key(vehicleImageUrl);
+        signedUrl = await getSignedFileUrl(s3Key, 3600);
+      } catch (error) {
+        console.error(`Failed to generate signed URL for ${vehicleImageUrl}:`, error);
+      }
+    }
+    
+    documentsWithSignedUrls.push({
+      id: driver._id.toString() + '_vi',
+      type: 'vehicle_image',
+      url: vehicleImageUrl,
+      signedUrl,
+      status: 'pending',
+      uploadedAt: driver.createdAt,
+      fileName: 'vehicle_image.jpg',
+      mimeType: 'image/jpeg'
+    });
+  }
 
   res.json({
     success: true,
@@ -134,27 +160,14 @@ exports.uploadDocument = asyncHandler(async (req, res) => {
   const s3FileName = `drivers/${driver._id}/${documentType}_${Date.now()}${fileExtension}`;
   const s3Url = await uploadToS3(req.file.buffer, s3FileName, req.file.mimetype);
 
-  // Vehicle image goes into vehicleDetails.vehicleImages, not documents array
+  // Vehicle image also goes into vehicleDetails.vehicleImages for backward compatibility
   if (documentType === 'vehicle_image') {
+    if (!driver.vehicleDetails) driver.vehicleDetails = {};
+    if (!driver.vehicleDetails.vehicleImages) driver.vehicleDetails.vehicleImages = [];
     driver.vehicleDetails.vehicleImages.push(s3Url);
-    await driver.save();
-
-    const signedUrl = await getSignedFileUrl(s3FileName, 3600);
-
-    return res.status(201).json({
-      success: true,
-      message: 'Vehicle image uploaded successfully',
-      data: {
-        type: 'vehicle_image',
-        url: s3Url,
-        signedUrl,
-        uploadedAt: new Date(),
-        vehicleType: driver.vehicleDetails.vehicleType || null
-      }
-    });
   }
 
-  // license / registration flow
+  // Common document flow for license, registration, and vehicle_image
   const existingDocIndex = driver.documents.findIndex(doc => doc.type === documentType);
 
   if (existingDocIndex !== -1) {
