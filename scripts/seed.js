@@ -15,34 +15,7 @@ async function seedDatabase() {
     console.log('Seeding pricing configurations...');
     const pricingData = [
       {
-        vehicleType: VEHICLE_TYPES.SMALL_CAR,
-        basePrice: 40,
-        perKmRate: 3,
-        minimumFare: 40,
-        serviceFeePercentage: 10,
-        driverCommissionPercentage: 80,
-        isActive: true
-      },
-      {
-        vehicleType: VEHICLE_TYPES.SEDAN,
-        basePrice: 50,
-        perKmRate: 5,
-        minimumFare: 50,
-        serviceFeePercentage: 10,
-        driverCommissionPercentage: 80,
-        isActive: true
-      },
-      {
-        vehicleType: VEHICLE_TYPES.SUV,
-        basePrice: 70,
-        perKmRate: 7,
-        minimumFare: 70,
-        serviceFeePercentage: 10,
-        driverCommissionPercentage: 80,
-        isActive: true
-      },
-      {
-        vehicleType: VEHICLE_TYPES.TRUCK,
+        vehicleType: VEHICLE_TYPES.STANDARD_TOW,
         basePrice: 100,
         perKmRate: 10,
         minimumFare: 100,
@@ -51,10 +24,19 @@ async function seedDatabase() {
         isActive: true
       },
       {
-        vehicleType: VEHICLE_TYPES.HEAVY_VEHICLE,
+        vehicleType: VEHICLE_TYPES.COMFORT_TOW,
         basePrice: 150,
         perKmRate: 15,
         minimumFare: 150,
+        serviceFeePercentage: 10,
+        driverCommissionPercentage: 80,
+        isActive: true
+      },
+      {
+        vehicleType: VEHICLE_TYPES.LUXURY_TRANSPORT,
+        basePrice: 200,
+        perKmRate: 20,
+        minimumFare: 200,
         serviceFeePercentage: 10,
         driverCommissionPercentage: 80,
         isActive: true

@@ -33,7 +33,7 @@ exports.getDocumentRequirements = asyncHandler(async (req, res) => {
         acceptedFormats: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
         maxSize: '5MB',
         extraFields: [
-          { name: 'vehicleType', type: 'string', required: true, description: 'Type of vehicle (small_car, sedan, suv, truck, heavy_vehicle)' }
+          { name: 'vehicleType', type: 'string', required: true, description: 'Type of vehicle (standard_tow, comfort_tow, luxury_transport)' }
         ]
       }
     ]

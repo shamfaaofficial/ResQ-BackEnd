@@ -7,11 +7,9 @@ module.exports = {
   },
 
   VEHICLE_TYPES: {
-    SMALL_CAR: 'small_car',
-    SEDAN: 'sedan',
-    SUV: 'suv',
-    TRUCK: 'truck',
-    HEAVY_VEHICLE: 'heavy_vehicle'
+    STANDARD_TOW: 'standard_tow',
+    COMFORT_TOW: 'comfort_tow',
+    LUXURY_TRANSPORT: 'luxury_transport'
   },
 
   BOOKING_STATUS: {
@@ -82,12 +80,6 @@ module.exports = {
     TRIP_COMPLETED: 'trip_completed',
     PAYMENT_REMINDER: 'payment_reminder',
     ADMIN_MESSAGE: 'admin_message'
-  },
-
-  TOW_SERVICE_TYPES: {
-    STANDARD_TOW: 'standard_tow',
-    COMFORT_TOW: 'comfort_tow',
-    LUXURY_TRANSPORT: 'luxury_transport'
   },
 
   QATAR_COUNTRY_CODE: '+974',
