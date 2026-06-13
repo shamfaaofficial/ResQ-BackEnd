@@ -103,8 +103,7 @@ class NotificationService {
       type: NOTIFICATION_TYPE.BOOKING_REQUEST,
       title: 'New Booking Request',
       message,
-      data: notificationData,
-      dataOnly: true // Send data-only message for booking requests
+      data: notificationData
     });
   }
 
