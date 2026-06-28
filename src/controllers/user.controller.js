@@ -315,8 +315,10 @@ exports.getRideHistory = asyncHandler(async (req, res) => {
       query.status = status;
     }
   } else {
-    // Default: Show only completed trips
-    query.status = BOOKING_STATUS.COMPLETED;
+    // Default: Show completed and cancelled trips
+    query.status = {
+      $in: [BOOKING_STATUS.COMPLETED, BOOKING_STATUS.CANCELLED_BY_USER, BOOKING_STATUS.CANCELLED_BY_DRIVER]
+    };
   }
 
   // Filter by date range
@@ -372,8 +374,8 @@ exports.getRideHistory = asyncHandler(async (req, res) => {
   const { extractS3Key, getSignedFileUrl } = require('../config/s3');
 
   const filteredBookings = await Promise.all(bookings.map(async (booking) => {
-    if (booking.payment?.status !== PAYMENT_STATUS.COMPLETED) {
-      // Remove driver details if payment not completed
+    if (booking.payment?.status !== PAYMENT_STATUS.COMPLETED && ![BOOKING_STATUS.CANCELLED_BY_USER, BOOKING_STATUS.CANCELLED_BY_DRIVER].includes(booking.status)) {
+      // Remove driver details if payment not completed (except for cancelled bookings)
       return {
         ...booking,
         driverId: null

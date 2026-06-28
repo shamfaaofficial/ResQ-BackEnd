@@ -981,8 +981,8 @@ exports.getUserBookingHistory = asyncHandler(async (req, res) => {
 
   const bookingsWithSignedUrls = await Promise.all(
     bookings.map(async (booking) => {
-      // CRITICAL: Remove driver details if payment not completed
-      if (booking.payment?.status !== PAYMENT_STATUS.COMPLETED) {
+      // CRITICAL: Remove driver details if payment not completed (except for cancelled bookings)
+      if (booking.payment?.status !== PAYMENT_STATUS.COMPLETED && ![BOOKING_STATUS.CANCELLED_BY_USER, BOOKING_STATUS.CANCELLED_BY_DRIVER].includes(booking.status)) {
         return {
           ...booking,
           driverId: null
