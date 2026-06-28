@@ -173,13 +173,34 @@ exports.getPriceEstimate = asyncHandler(async (req, res) => {
 
   const distanceInKm = distanceData.distance / 1000;
 
-  // Pricing: 10 QAR per km, base price 110 (switches to 0 if distance >= 110)
-  const minimumCharge = 110;
-  const perKmRate = 10;
-  const distancePrice = distanceInKm * perKmRate;
-  // Base price: 110 if distance < 110, else 0
-  const basePrice = distancePrice >= minimumCharge ? 0 : minimumCharge;
-  // Total: base + distance
+  const { driverId, vehicleType } = req.query;
+
+  // Determine vehicle type
+  let type = vehicleType;
+  if (!type && driverId) {
+    const Driver = require('../models/Driver');
+    const driver = await Driver.findById(driverId);
+    if (driver && driver.vehicleDetails) {
+      type = driver.vehicleDetails.vehicleType;
+    }
+  }
+  if (!type) {
+    type = 'standard_tow';
+  }
+
+  // Pricing: Standard=120, Comfort/Fulldown=175, Luxury=360. Includes 23km, 5 QAR per extra km.
+  let basePrice = 120;
+  let includedKm = 23;
+  let perKmRate = 5;
+
+  if (type === 'comfort_tow') {
+    basePrice = 175;
+  } else if (type === 'luxury_transport') {
+    basePrice = 360;
+  }
+
+  const extraDistance = Math.max(0, distanceInKm - includedKm);
+  const distancePrice = extraDistance * perKmRate;
   const totalAmount = basePrice + distancePrice;
 
   res.status(200).json({
@@ -195,8 +216,10 @@ exports.getPriceEstimate = asyncHandler(async (req, res) => {
         totalAmount: Math.round(totalAmount * 100) / 100,
         currency: 'QAR',
         breakdown: {
-          base: basePrice > 0 ? `${basePrice} QAR (minimum charge)` : '0 QAR (distance exceeds minimum)',
-          distance: `${Math.round(distanceInKm * 10) / 10} km × ${perKmRate} QAR/km = ${Math.round(distancePrice * 100) / 100} QAR`,
+          base: `${basePrice} QAR (includes up to ${includedKm} km)`,
+          distance: extraDistance > 0
+            ? `${Math.round(extraDistance * 10) / 10} extra km × ${perKmRate} QAR/km = ${Math.round(distancePrice * 100) / 100} QAR`
+            : `0 QAR (within included ${includedKm} km)`,
           total: `${basePrice} QAR + ${Math.round(distancePrice * 100) / 100} QAR = ${Math.round(totalAmount * 100) / 100} QAR`
         }
       }
@@ -244,13 +267,19 @@ exports.createBooking = asyncHandler(async (req, res) => {
 
   const distanceInKm = distanceData.distance / 1000;
 
-  // Pricing: 10 QAR per km, base price 110 (switches to 0 if distance >= 110)
-  const minimumCharge = 110;
-  const perKmRate = 10;
-  const distancePrice = distanceInKm * perKmRate;
-  // Base price: 110 if distance < 110, else 0
-  const basePrice = distancePrice >= minimumCharge ? 0 : minimumCharge;
-  // Total: base + distance
+  // Pricing: Standard=120, Comfort/Fulldown=175, Luxury=360. Includes 23km, 5 QAR per extra km.
+  let basePrice = 120;
+  let includedKm = 23;
+  let perKmRate = 5;
+
+  if (vehicleType === 'comfort_tow') {
+    basePrice = 175;
+  } else if (vehicleType === 'luxury_transport') {
+    basePrice = 360;
+  }
+
+  const extraDistance = Math.max(0, distanceInKm - includedKm);
+  const distancePrice = extraDistance * perKmRate;
   const totalAmount = basePrice + distancePrice;
 
   // Generate booking number
