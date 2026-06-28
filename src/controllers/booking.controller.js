@@ -188,16 +188,11 @@ exports.getPriceEstimate = asyncHandler(async (req, res) => {
     type = 'standard_tow';
   }
 
-  // Pricing: Standard=120, Comfort/Fulldown=175, Luxury=360. Includes 23km, 5 QAR per extra km.
-  let basePrice = 120;
-  let includedKm = 23;
-  let perKmRate = 5;
-
-  if (type === 'comfort_tow') {
-    basePrice = 175;
-  } else if (type === 'luxury_transport') {
-    basePrice = 360;
-  }
+  // Fetch pricing config from database
+  const pricingConfig = await PricingConfig.findOne({ vehicleType: type, isActive: true });
+  const basePrice = pricingConfig?.basePrice || 120;
+  const includedKm = pricingConfig?.includedKm !== undefined ? pricingConfig.includedKm : 23;
+  const perKmRate = pricingConfig?.perKmRate !== undefined ? pricingConfig.perKmRate : 5;
 
   const extraDistance = Math.max(0, distanceInKm - includedKm);
   const distancePrice = extraDistance * perKmRate;
@@ -267,16 +262,11 @@ exports.createBooking = asyncHandler(async (req, res) => {
 
   const distanceInKm = distanceData.distance / 1000;
 
-  // Pricing: Standard=120, Comfort/Fulldown=175, Luxury=360. Includes 23km, 5 QAR per extra km.
-  let basePrice = 120;
-  let includedKm = 23;
-  let perKmRate = 5;
-
-  if (vehicleType === 'comfort_tow') {
-    basePrice = 175;
-  } else if (vehicleType === 'luxury_transport') {
-    basePrice = 360;
-  }
+  // Fetch pricing config from database
+  const pricingConfig = await PricingConfig.findOne({ vehicleType, isActive: true });
+  const basePrice = pricingConfig?.basePrice || 120;
+  const includedKm = pricingConfig?.includedKm !== undefined ? pricingConfig.includedKm : 23;
+  const perKmRate = pricingConfig?.perKmRate !== undefined ? pricingConfig.perKmRate : 5;
 
   const extraDistance = Math.max(0, distanceInKm - includedKm);
   const distancePrice = extraDistance * perKmRate;

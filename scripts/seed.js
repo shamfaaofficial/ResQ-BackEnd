@@ -16,27 +16,30 @@ async function seedDatabase() {
     const pricingData = [
       {
         vehicleType: VEHICLE_TYPES.STANDARD_TOW,
-        basePrice: 100,
-        perKmRate: 10,
-        minimumFare: 100,
+        basePrice: 120,
+        perKmRate: 5,
+        minimumFare: 120,
+        includedKm: 23,
         serviceFeePercentage: 10,
         driverCommissionPercentage: 80,
         isActive: true
       },
       {
         vehicleType: VEHICLE_TYPES.COMFORT_TOW,
-        basePrice: 150,
-        perKmRate: 15,
-        minimumFare: 150,
+        basePrice: 175,
+        perKmRate: 5,
+        minimumFare: 175,
+        includedKm: 23,
         serviceFeePercentage: 10,
         driverCommissionPercentage: 80,
         isActive: true
       },
       {
         vehicleType: VEHICLE_TYPES.LUXURY_TRANSPORT,
-        basePrice: 200,
-        perKmRate: 20,
-        minimumFare: 200,
+        basePrice: 360,
+        perKmRate: 5,
+        minimumFare: 360,
+        includedKm: 23,
         serviceFeePercentage: 10,
         driverCommissionPercentage: 80,
         isActive: true

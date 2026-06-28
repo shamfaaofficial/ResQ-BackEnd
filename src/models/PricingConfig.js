@@ -23,6 +23,11 @@ const pricingConfigSchema = new mongoose.Schema({
     required: true,
     min: 0
   },
+  includedKm: {
+    type: Number,
+    default: 23,
+    min: 0
+  },
   serviceFeePercentage: {
     type: Number,
     default: 0,

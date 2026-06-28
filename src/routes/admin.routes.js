@@ -6,6 +6,7 @@ const adminTripController = require('../controllers/admin.trip.controller');
 const adminDashboardController = require('../controllers/admin.dashboard.controller');
 const adminDocumentController = require('../controllers/admin.document.controller');
 const adminSettingsController = require('../controllers/admin.settings.controller');
+const adminPricingController = require('../controllers/admin.pricing.controller');
 const adminWithdrawalController = require('../controllers/admin.withdrawal.controller');
 const { authMiddleware, roleMiddleware } = require('../middlewares/auth');
 
@@ -146,6 +147,13 @@ router.put('/settings/:settingKey', adminSettingsController.updateSetting);
 
 // Delete a setting
 router.delete('/settings/:settingKey', adminSettingsController.deleteSetting);
+
+/**
+ * PRICING CONFIGURATION ROUTES
+ */
+router.get('/pricing', adminPricingController.getAllPricingConfigs);
+router.get('/pricing/:vehicleType', adminPricingController.getPricingConfigByVehicleType);
+router.put('/pricing/:vehicleType', adminPricingController.updatePricingConfig);
 
 /**
  * WITHDRAWAL MANAGEMENT ROUTES
