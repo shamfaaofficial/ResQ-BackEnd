@@ -541,7 +541,8 @@ exports.driverLogin = asyncHandler(async (req, res) => {
       driver: driver ? {
         id: driver._id,
         approvalStatus: driver.approvalStatus,
-        isOnline: driver.isOnline
+        isOnline: driver.isOnline,
+        vehicleDetails: driver.vehicleDetails
       } : null,
       accessToken,
       refreshToken
@@ -699,12 +700,12 @@ exports.driverSubmitDocuments = asyncHandler(async (req, res) => {
 
     // Update driver with vehicle details and documents
     driver.vehicleDetails = {
-      type: vehicleType,
-      number: vehicleNumber,
-      make: vehicleMake,
-      model: vehicleModel,
-      year: vehicleYear,
-      color: vehicleColor
+      vehicleType,
+      vehicleNumber,
+      vehicleMake,
+      vehicleModel,
+      vehicleYear,
+      vehicleColor
     };
 
     driver.documents = {
